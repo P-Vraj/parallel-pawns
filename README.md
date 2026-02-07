@@ -1,8 +1,7 @@
 # Parallel Pawns
 
-### Run Command
+### Usage
+To run the project, use:
 ```bash
-clang++ -std=c++20 -O3 -march=native -Iinclude src/engine.cpp src/move_gen_tables.cpp -fconstexpr-steps=20000 -o engine
+make run [BUILD=RELEASE|DEBUG]
 ```
-
-Note: `-fconstexpr-steps` can be set up to 2000000 (for more constexpr work to be done)
