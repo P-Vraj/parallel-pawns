@@ -1,0 +1,79 @@
+#pragma once
+#include <string>
+#include <format>
+#include <utility>
+#include <iostream>
+#include "types.h"
+
+using std::to_underlying;
+
+inline std::string to_string(Color c) {
+    return c == Color::White ? "w" : "b";
+}
+
+inline char to_char(PieceType pt) {
+    switch (pt) {
+        case PieceType::Pawn:   return 'p';
+        case PieceType::Knight: return 'n';
+        case PieceType::Bishop: return 'b';
+        case PieceType::Rook:   return 'r';
+        case PieceType::Queen:  return 'q';
+        case PieceType::King:   return 'k';
+        default:                return '.';
+    }
+    return '?';
+}
+
+inline std::string to_string(Piece p) {
+    char pt = to_char(pieceType(p));
+    if (color(p) == Color::White) {
+        return std::string{static_cast<char>(toupper(pt))};
+    }
+    return std::string{pt};
+}
+
+inline std::string to_string(Square sq) {
+    if (sq == Square::None) {
+        return "0000"; // UCI nullmove
+    }
+    char f = 'a' + to_underlying(file(sq));
+    char r = '1' + to_underlying(rank(sq));
+    return std::string{f, r};
+}
+
+// Long algebraic notation format 
+inline std::string to_string(Move m) {
+    return to_string(m.from()) + to_string(m.to())
+        + (m.isPromotion() ? std::string{to_char(m.promotionType())} : "");
+}
+
+inline std::string to_string(Bitboard b) {
+    std::string divider = "+---+---+---+---+---+---+---+---+";
+    std::string out = divider + "\n";
+
+    for (int r = 7; r >= 0; --r) {
+        for (int f = 0; f < 8; ++f) {
+            Square sq = make_square(static_cast<File>(f), static_cast<Rank>(r));
+            out += (b & bitboard(sq)) ? "| * " : "|   ";
+        }
+        out += "| " + std::string{static_cast<char>('1' + r)};
+        out += "\n" + divider + "\n";
+    }
+
+    out += "  a   b   c   d   e   f   g   h\n";
+    return out;
+}
+
+constexpr inline void set_bit(Bitboard& b, Square sq) noexcept { b |= bitboard(sq); }
+
+constexpr inline void clear_bit(Bitboard& b, Square sq) noexcept { b &= ~bitboard(sq); }
+
+constexpr inline bool get_bit(Bitboard b, Square sq) noexcept { return b & bitboard(sq); }
+
+constexpr inline int get_lsb(Bitboard b) noexcept { return __builtin_ctzll(b); }
+
+constexpr inline int pop_lsb(Bitboard& b) noexcept {
+    int lsbIndex = get_lsb(b);
+    b &= b - 1;
+    return lsbIndex;
+}
