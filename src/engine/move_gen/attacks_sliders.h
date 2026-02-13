@@ -15,18 +15,6 @@ constexpr inline size_t magic_index(const Magic& magic, Bitboard blockers) noexc
     return static_cast<size_t>(((blockers & magic.mask) * magic.magic) >> magic.shift);
 }
 
-inline Bitboard get_rook_attacks(Square sq, Bitboard blockers) noexcept {
-    const Magic& magic = kRookMagics[to_underlying(sq)];
-    const size_t index = magic_index(magic, blockers);
-    return kRookAttacksTable[(to_underlying(sq) * kRookStride) + index];
-}
-
-inline Bitboard get_bishop_attacks(Square sq, Bitboard blockers) noexcept {
-    const Magic& magic = kBishopMagics[to_underlying(sq)];
-    const size_t index = magic_index(magic, blockers);
-    return kBishopAttacksTable[(to_underlying(sq) * kBishopStride) + index];
-}
-
 constexpr inline Bitboard rook_mask(Square sq) noexcept {
     Bitboard mask = 0;
     int curFile = to_underlying(file(sq));
