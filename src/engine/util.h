@@ -77,3 +77,5 @@ constexpr inline int pop_lsb(Bitboard& b) noexcept {
     b &= b - 1;
     return lsbIndex;
 }
+
+constexpr inline int bit_count(Bitboard b) noexcept { return __builtin_popcountll(b); }
