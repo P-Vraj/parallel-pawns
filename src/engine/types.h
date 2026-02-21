@@ -3,9 +3,10 @@
 #include <cstdint>
 #include <utility>
 
-using std::to_underlying;
+using std::to_underlying, std::size_t;
 
-using Bitboard = uint64_t;
+using Bitboard  = uint64_t;
+using Key       = uint64_t;
 
 enum class Square : uint8_t {
     A1, B1, C1, D1, E1, F1, G1, H1,
@@ -158,10 +159,6 @@ constexpr Color operator~(Color c) noexcept {
     return c == Color::White ? Color::Black : Color::White; 
 }
 
-constexpr size_t idx(Color c) noexcept {
-    return static_cast<size_t>(c);
-}
-
 enum class PieceType : uint8_t {
     None,
     Pawn,
@@ -173,10 +170,6 @@ enum class PieceType : uint8_t {
 
     Count = 7
 };
-
-constexpr size_t idx(PieceType pt) noexcept {
-    return static_cast<size_t>(pt);
-}
 
 enum class Piece : uint8_t {
     None,
@@ -197,6 +190,29 @@ constexpr PieceType pieceType(Piece p) noexcept {
 constexpr Piece make_piece(Color c, PieceType pt) noexcept {
     return Piece(to_underlying(pt) + (to_underlying(c) * 8));
 }
+
+enum class CastlingRights : uint8_t {
+    None            = 0b0000,
+    WhiteKingside   = 0b0001,
+    WhiteQueenside  = 0b0010,
+    BlackKingside   = 0b0100,
+    BlackQueenside  = 0b1000,
+    All             = 0b1111,
+
+    Count = 5
+};
+
+constexpr CastlingRights operator|(CastlingRights a, CastlingRights b) {
+    return static_cast<CastlingRights>(static_cast<uint8_t>(a) | static_cast<uint8_t>(b));
+}
+
+constexpr CastlingRights operator&(CastlingRights a, CastlingRights b) {
+    return static_cast<CastlingRights>(static_cast<uint8_t>(a) & static_cast<uint8_t>(b));
+}
+
+constexpr CastlingRights& operator|=(CastlingRights& a, CastlingRights b) { return a = a | b; }
+
+constexpr CastlingRights& operator&=(CastlingRights& a, CastlingRights b) { return a = a & b; }
 
 enum class MoveType : uint8_t {
     Normal                      = 0b0000,
@@ -273,45 +289,4 @@ struct Move {
 
 private:
     uint16_t data_;
-};
-
-
-struct Board {
-    template <Color C, PieceType PT>
-    constexpr Bitboard get() const {
-        static_assert(C < Color::Count);
-        static_assert(PT >= PieceType::Pawn && PT <= PieceType::King);
-        return pieces_[idx(C)][idx(PT) - 1];
-    }
-
-    constexpr Bitboard get(Color c, PieceType pt) const {
-        return pieces_[idx(c)][idx(pt) - 1];
-    }
-
-    template<Color C>
-    constexpr Bitboard occupancy() const {
-        static_assert(C < Color::Count);
-        return colorOccupied_[idx(C)];
-    }
-
-    constexpr Bitboard occupancy() const {
-        return occupied_;
-    }
-
-    // Recomputes occupancy bitboards (used during changes not reachable through move/unmove)
-    void recomputeOccupancy() {
-        for (size_t c = 0; c < idx(Color::Count); ++c) {
-            Bitboard occ = 0;
-            for (size_t pt = idx(PieceType::Pawn); pt < idx(PieceType::Count); ++pt) {
-                occ |= get(Color(c), PieceType(pt));
-            }
-            colorOccupied_[c] = occ;
-        }
-        occupied_ = occupancy<Color::White>() | occupancy<Color::Black>();
-    }
-
-private:
-    std::array<std::array<Bitboard, idx(PieceType::Count) - 1>, idx(Color::Count)> pieces_;
-    std::array<Bitboard, idx(Color::Count)> colorOccupied_;
-    Bitboard occupied_;
 };

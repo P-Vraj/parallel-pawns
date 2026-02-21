@@ -3,6 +3,7 @@
 #include <format>
 #include <utility>
 #include <iostream>
+
 #include "types.h"
 
 using std::to_underlying;

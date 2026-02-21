@@ -3,7 +3,7 @@
 
 #pragma once
 #include <array>
-#include <atomic>
+
 #include "magics_generated.h"
 
 const size_t kRookStride = 4096;

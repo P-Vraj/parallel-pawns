@@ -2,7 +2,9 @@
 #include "attacks_leapers.h"
 #include "attacks_sliders.h"
 
-static void init_attack_tables() noexcept {
+namespace attacks {
+
+inline void init_attack_tables() noexcept {
     init_rook_attacks_table();
     init_bishop_attacks_table();
 }
@@ -34,3 +36,5 @@ inline Bitboard king_attacks(Square sq) noexcept {
 inline Bitboard pawn_attacks(Color c, Square sq) noexcept {
     return kPawnAttacksTable[to_underlying(c)][to_underlying(sq)];
 }
+
+} // namespace attacks

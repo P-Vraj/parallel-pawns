@@ -1,10 +1,20 @@
 #include <iostream>
-#include "types.h"
+
 #include "util.h"
+#include "types.h"
+#include "zobrist.h"
+#include "position.h"
 #include "move_gen/attacks.h"
 
+using namespace attacks;
+
+void engine_init() {
+    zobrist::init();
+    attacks::init_attack_tables();
+}
+
 int main() {
-    init_attack_tables();
+    engine_init();
 
     Bitboard blockers = bitboard(Square::B2) | bitboard(Square::F1);
     std::cout << "Blockers:\n" << to_string(blockers) << '\n';

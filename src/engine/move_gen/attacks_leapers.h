@@ -1,5 +1,6 @@
 #pragma once
 #include <span>
+
 #include "../types.h"
 
 constexpr std::array<Bitboard, 64> get_non_sliding_attacks_table(std::span<const std::pair<int, int>> deltas) {

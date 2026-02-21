@@ -4,6 +4,7 @@
 #include <span>
 #include <random>
 #include <format>
+
 #include "../src/engine/types.h"
 #include "../src/engine/util.h"
 #include "../src/engine/move_gen/attacks_sliders.h"
