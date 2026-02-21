@@ -17,4 +17,4 @@ constexpr std::array<uint8_t, 64> make_castle_mask() {
 }
 
 static constexpr std::array<uint8_t, 64> kCastleMask = make_castle_mask();
-}
+}  // namespace

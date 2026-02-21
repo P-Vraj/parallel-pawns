@@ -1,13 +1,15 @@
 // This script finds magic numbers for rook and bishop move generation
-// Run: `clang++ -std=c++23 -O3 -Wall -I. tools/find_magics.cpp -o build/find_magics && ./build/find_magics > src/engine/move_gen/magics_generated.h`
+// Build and run with:
+// `clang++ -std=c++23 -O3 -Wall -I. tools/find_magics.cpp -o build/find_magics`
+// `./build/find_magics > src/engine/move_gen/magics_generated.h`
 
-#include <span>
-#include <random>
 #include <format>
+#include <random>
+#include <span>
 
+#include "../src/engine/move_gen/attacks_sliders.h"
 #include "../src/engine/types.h"
 #include "../src/engine/util.h"
-#include "../src/engine/move_gen/attacks_sliders.h"
 
 static inline uint64_t sparse_rand64(std::mt19937_64& rng) noexcept {
     // Sparse randoms (few bits set) are more likely to produce good magic numbers
@@ -26,11 +28,7 @@ static Magic find_magic_for_square(
     std::vector<Bitboard> used(tableSize);
 
     while (true) {
-        Magic magic{
-            mask,
-            sparse_rand64(rng),
-            static_cast<uint8_t>(64 - relevantBits)
-        };
+        Magic magic{mask, sparse_rand64(rng), static_cast<uint8_t>(64 - relevantBits)};
 
         std::fill(used.begin(), used.end(), 0ULL);
 
@@ -59,9 +57,11 @@ static std::array<Magic, 64> find_magics(PieceType pieceType) {
     std::random_device rd;
     std::mt19937_64 rng(rd());
 
+    const bool isRook = pieceType == PieceType::Rook;
+
     for (size_t s = 0; s < 64; ++s) {
         const Square sq = static_cast<Square>(s);
-        const Bitboard mask = pieceType == PieceType::Rook ? rook_mask(sq) : bishop_mask(sq);
+        const Bitboard mask = isRook ? rook_mask(sq) : bishop_mask(sq);
         const int relevantBits = bit_count(mask);
         const size_t count = 1u << relevantBits;
 
@@ -72,7 +72,7 @@ static std::array<Magic, 64> find_magics(PieceType pieceType) {
 
         for (size_t i = 0; i < count; ++i) {
             const Bitboard occ = index_to_occupancy(mask, i);
-            const Bitboard att = pieceType == PieceType::Rook ? rook_attacks_ray(sq, occ) : bishop_attacks_ray(sq, occ);
+            const Bitboard att = isRook ? rook_attacks_ray(sq, occ) : bishop_attacks_ray(sq, occ);
             occs.push_back(occ);
             atts.push_back(att);
         }

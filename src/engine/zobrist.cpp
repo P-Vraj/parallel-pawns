@@ -2,7 +2,7 @@
 
 namespace zobrist {
 
-std::array<std::array<std::array<Key, 64>, to_underlying(PieceType::Count) - 1>, to_underlying(Color::Count)> piece;
+std::array<std::array<std::array<Key, 64>, to_underlying(PieceType::Count) - 1>, 2> piece;
 std::array<Key, to_underlying(CastlingRights::Count)> castling;
 std::array<Key, 8> enPassantFile;
 Key side;
@@ -17,7 +17,7 @@ static inline Key prng(uint64_t& state) noexcept {
 }
 
 void init(uint64_t seed) noexcept {
-    for (size_t c = 0; c < to_underlying(Color::Count); ++c) {
+    for (size_t c = 0; c < 2; ++c) {
         for (size_t pt = to_underlying(PieceType::Pawn); pt < to_underlying(PieceType::Count); ++pt) {
             for (size_t sq = 0; sq < 64; ++sq) {
                 piece[c][pt - 1][sq] = prng(seed);
@@ -36,4 +36,4 @@ void init(uint64_t seed) noexcept {
     side = prng(seed);
 }
 
-} // namespace zobrist
+}  // namespace zobrist

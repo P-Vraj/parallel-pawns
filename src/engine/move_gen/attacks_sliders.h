@@ -55,7 +55,7 @@ constexpr inline Bitboard bishop_mask(Square sq) noexcept {
     for (int f = curFile - 1, r = curRank - 1; f >= 1 && r >= 1; --f, --r) {
         mask |= bitboard(make_square(static_cast<File>(f), static_cast<Rank>(r)));
     }
-    
+
     return mask;
 }
 
@@ -68,25 +68,29 @@ constexpr inline Bitboard rook_attacks_ray(Square sq, Bitboard occupancy) noexce
     for (int r = curRank + 1; r <= 7; ++r) {
         Square to = make_square(static_cast<File>(curFile), static_cast<Rank>(r));
         attacks |= bitboard(to);
-        if (occupancy & bitboard(to)) break;
+        if (occupancy & bitboard(to))
+            break;
     }
     // South
     for (int r = curRank - 1; r >= 0; --r) {
         Square to = make_square(static_cast<File>(curFile), static_cast<Rank>(r));
         attacks |= bitboard(to);
-        if (occupancy & bitboard(to)) break;
+        if (occupancy & bitboard(to))
+            break;
     }
     // East
     for (int f = curFile + 1; f <= 7; ++f) {
         Square to = make_square(static_cast<File>(f), static_cast<Rank>(curRank));
         attacks |= bitboard(to);
-        if (occupancy & bitboard(to)) break;
+        if (occupancy & bitboard(to))
+            break;
     }
     // West
     for (int f = curFile - 1; f >= 0; --f) {
         Square to = make_square(static_cast<File>(f), static_cast<Rank>(curRank));
         attacks |= bitboard(to);
-        if (occupancy & bitboard(to)) break;
+        if (occupancy & bitboard(to))
+            break;
     }
 
     return attacks;
@@ -101,25 +105,29 @@ constexpr inline Bitboard bishop_attacks_ray(Square sq, Bitboard occupancy) noex
     for (int f = curFile + 1, r = curRank + 1; f <= 7 && r <= 7; ++f, ++r) {
         Square to = make_square(static_cast<File>(f), static_cast<Rank>(r));
         attacks |= bitboard(to);
-        if (occupancy & bitboard(to)) break;
+        if (occupancy & bitboard(to))
+            break;
     }
     // Southeast
     for (int f = curFile + 1, r = curRank - 1; f <= 7 && r >= 0; ++f, --r) {
         Square to = make_square(static_cast<File>(f), static_cast<Rank>(r));
         attacks |= bitboard(to);
-        if (occupancy & bitboard(to)) break;
+        if (occupancy & bitboard(to))
+            break;
     }
     // Southwest
     for (int f = curFile - 1, r = curRank - 1; f >= 0 && r >= 0; --f, --r) {
         Square to = make_square(static_cast<File>(f), static_cast<Rank>(r));
         attacks |= bitboard(to);
-        if (occupancy & bitboard(to)) break;
+        if (occupancy & bitboard(to))
+            break;
     }
     // Northwest
     for (int f = curFile - 1, r = curRank + 1; f >= 0 && r <= 7; --f, ++r) {
         Square to = make_square(static_cast<File>(f), static_cast<Rank>(r));
         attacks |= bitboard(to);
-        if (occupancy & bitboard(to)) break;
+        if (occupancy & bitboard(to))
+            break;
     }
 
     return attacks;
@@ -130,7 +138,8 @@ constexpr inline Bitboard index_to_occupancy(Bitboard mask, size_t index) noexce
     while (mask) {
         Bitboard lsb = mask & (~mask + 1);
         mask ^= lsb;
-        if (index & 1ULL) occ |= lsb;
+        if (index & 1ULL)
+            occ |= lsb;
         index >>= 1ULL;
     }
     return occ;

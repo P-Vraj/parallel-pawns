@@ -5,9 +5,10 @@
 
 using std::to_underlying, std::size_t;
 
-using Bitboard  = uint64_t;
-using Key       = uint64_t;
+using Bitboard = uint64_t;
+using Key = uint64_t;
 
+// clang-format off
 enum class Square : uint8_t {
     A1, B1, C1, D1, E1, F1, G1, H1,
     A2, B2, C2, D2, E2, F2, G2, H2,
@@ -21,27 +22,34 @@ enum class Square : uint8_t {
 
     Count = 64
 };
+// clang-format on
 
+// clang-format off
 enum class Direction : int8_t {
-    North       = +8,
-    South       = -8,
-    East        = +1,
-    West        = -1,
-    NorthEast   = +9,
-    NorthWest   = +7,
-    SouthEast   = -7,
-    SouthWest   = -9,
+    North     = +8,
+    South     = -8,
+    East      = +1,
+    West      = -1,
+    NorthEast = +9,
+    NorthWest = +7,
+    SouthEast = -7,
+    SouthWest = -9,
 
     Count = 8,
 };
+// clang-format on
 
 constexpr inline Square operator+(Square sq, Direction dir) noexcept {
     return static_cast<Square>(to_underlying(sq) + to_underlying(dir));
 }
 
-constexpr inline Square operator+(Direction dir, Square sq) noexcept { return sq + dir; }
+constexpr inline Square operator+(Direction dir, Square sq) noexcept {
+    return sq + dir;
+}
 
-constexpr inline Square& operator+=(Square& sq, Direction dir) noexcept { return sq = sq + dir; }
+constexpr inline Square& operator+=(Square& sq, Direction dir) noexcept {
+    return sq = sq + dir;
+}
 
 constexpr inline Square& operator++(Square& sq) noexcept {
     return sq = static_cast<Square>(to_underlying(sq) + 1);
@@ -51,7 +59,9 @@ constexpr inline Square operator-(Square sq, Direction dir) noexcept {
     return static_cast<Square>(to_underlying(sq) - to_underlying(dir));
 }
 
-constexpr inline Square& operator-=(Square& sq, Direction dir) noexcept { return sq = sq - dir; }
+constexpr inline Square& operator-=(Square& sq, Direction dir) noexcept {
+    return sq = sq - dir;
+}
 
 constexpr inline Square& operator--(Square& sq) noexcept {
     return sq = static_cast<Square>(to_underlying(sq) - 1);
@@ -70,7 +80,9 @@ enum class File : uint8_t {
     Count = 8,
 };
 
-constexpr File file(Square sq) noexcept { return File(to_underlying(sq) % 8); }
+constexpr File file(Square sq) noexcept {
+    return File(to_underlying(sq) % 8);
+}
 
 constexpr bool isValid(File f) noexcept {
     return to_underlying(f) < to_underlying(File::Count);
@@ -81,20 +93,32 @@ constexpr inline File& operator+=(File& f, int rhs) noexcept {
     return f;
 }
 
-constexpr inline File operator+(File lhs, int rhs) noexcept { lhs += rhs; return lhs; }
+constexpr inline File operator+(File lhs, int rhs) noexcept {
+    lhs += rhs;
+    return lhs;
+}
 
-constexpr inline File operator+(int lhs, File rhs) noexcept { return rhs + lhs; }
+constexpr inline File operator+(int lhs, File rhs) noexcept {
+    return rhs + lhs;
+}
 
-constexpr inline File& operator++(File& f) noexcept { return f += 1; }
+constexpr inline File& operator++(File& f) noexcept {
+    return f += 1;
+}
 
 constexpr inline File& operator-=(File& f, int rhs) noexcept {
     f = static_cast<File>(static_cast<int>(to_underlying(f)) - rhs);
     return f;
 }
 
-constexpr inline File operator-(File lhs, int rhs) noexcept { lhs -= rhs; return lhs; }
+constexpr inline File operator-(File lhs, int rhs) noexcept {
+    lhs -= rhs;
+    return lhs;
+}
 
-constexpr inline File& operator--(File& f) noexcept { return f -= 1; }
+constexpr inline File& operator--(File& f) noexcept {
+    return f -= 1;
+}
 
 enum class Rank : uint8_t {
     R1,
@@ -110,7 +134,9 @@ enum class Rank : uint8_t {
 };
 
 // Returns the 0-indexed rank of a square
-constexpr Rank rank(Square sq) noexcept { return Rank(to_underlying(sq) / 8); }
+constexpr Rank rank(Square sq) noexcept {
+    return Rank(to_underlying(sq) / 8);
+}
 
 constexpr bool isValid(Rank r) noexcept {
     return to_underlying(r) < to_underlying(Rank::Count);
@@ -121,20 +147,32 @@ constexpr inline Rank& operator+=(Rank& r, int rhs) noexcept {
     return r;
 }
 
-constexpr inline Rank operator+(Rank lhs, int rhs) noexcept { lhs += rhs; return lhs; }
+constexpr inline Rank operator+(Rank lhs, int rhs) noexcept {
+    lhs += rhs;
+    return lhs;
+}
 
-constexpr inline Rank operator+(int lhs, Rank rhs) noexcept { return rhs + lhs; }
+constexpr inline Rank operator+(int lhs, Rank rhs) noexcept {
+    return rhs + lhs;
+}
 
-constexpr inline Rank& operator++(Rank& r) noexcept { return r += 1; }
+constexpr inline Rank& operator++(Rank& r) noexcept {
+    return r += 1;
+}
 
 constexpr inline Rank& operator-=(Rank& r, int rhs) noexcept {
     r = static_cast<Rank>(static_cast<int>(to_underlying(r)) - rhs);
     return r;
 }
 
-constexpr inline Rank operator-(Rank lhs, int rhs) noexcept { lhs -= rhs; return lhs; }
+constexpr inline Rank operator-(Rank lhs, int rhs) noexcept {
+    lhs -= rhs;
+    return lhs;
+}
 
-constexpr inline Rank& operator--(Rank& r) noexcept { return r -= 1; }
+constexpr inline Rank& operator--(Rank& r) noexcept {
+    return r -= 1;
+}
 
 constexpr Square make_square(File f, Rank r) noexcept {
     return Square(to_underlying(f) | (to_underlying(r) << 3));
@@ -156,7 +194,7 @@ enum class Color : uint8_t {
 };
 
 constexpr Color operator~(Color c) noexcept {
-    return c == Color::White ? Color::Black : Color::White; 
+    return c == Color::White ? Color::Black : Color::White;
 }
 
 enum class PieceType : uint8_t {
@@ -171,6 +209,7 @@ enum class PieceType : uint8_t {
     Count = 7
 };
 
+// clang-format off
 enum class Piece : uint8_t {
     None,
     WPawn = to_underlying(PieceType::Pawn),     WKnight, WBishop, WRook, WQueen, WKing,
@@ -178,6 +217,7 @@ enum class Piece : uint8_t {
     
     Count = 16
 };
+// clang-format on
 
 constexpr Color color(Piece p) noexcept {
     return Color(to_underlying(p) / 8);
@@ -191,16 +231,18 @@ constexpr Piece make_piece(Color c, PieceType pt) noexcept {
     return Piece(to_underlying(pt) + (to_underlying(c) * 8));
 }
 
+// clang-format off
 enum class CastlingRights : uint8_t {
-    None            = 0b0000,
-    WhiteKingside   = 0b0001,
-    WhiteQueenside  = 0b0010,
-    BlackKingside   = 0b0100,
-    BlackQueenside  = 0b1000,
-    All             = 0b1111,
+    None           = 0b0000,
+    WhiteKingside  = 0b0001,
+    WhiteQueenside = 0b0010,
+    BlackKingside  = 0b0100,
+    BlackQueenside = 0b1000,
+    All            = 0b1111,
 
     Count = 5
 };
+// clang-format on
 
 constexpr CastlingRights operator|(CastlingRights a, CastlingRights b) {
     return static_cast<CastlingRights>(static_cast<uint8_t>(a) | static_cast<uint8_t>(b));
@@ -210,10 +252,15 @@ constexpr CastlingRights operator&(CastlingRights a, CastlingRights b) {
     return static_cast<CastlingRights>(static_cast<uint8_t>(a) & static_cast<uint8_t>(b));
 }
 
-constexpr CastlingRights& operator|=(CastlingRights& a, CastlingRights b) { return a = a | b; }
+constexpr CastlingRights& operator|=(CastlingRights& a, CastlingRights b) {
+    return a = a | b;
+}
 
-constexpr CastlingRights& operator&=(CastlingRights& a, CastlingRights b) { return a = a & b; }
+constexpr CastlingRights& operator&=(CastlingRights& a, CastlingRights b) {
+    return a = a & b;
+}
 
+// clang-format off
 enum class MoveType : uint8_t {
     Normal                      = 0b0000,
     PawnDoubleStep              = 0b0001,
@@ -234,6 +281,7 @@ enum class MoveType : uint8_t {
 
     Count = 14,
 };
+// clang-format on
 
 struct Move {
     // A move is packed into 16 bits as follows:
@@ -241,47 +289,23 @@ struct Move {
     // Bits 6-11:   To square
     // Bits 12-15:  Move type
 
-    constexpr explicit Move(uint16_t data)
-        : data_(data) {}
-    constexpr Move(Square from, Square to)
-        : data_(to_underlying(from) | (to_underlying(to) << 6)) {}
+    constexpr explicit Move(uint16_t data) : data_(data) {}
+    constexpr Move(Square from, Square to) : data_(to_underlying(from) | (to_underlying(to) << 6)) {}
     constexpr Move(Square from, Square to, MoveType moveType)
         : data_(to_underlying(from) | (to_underlying(to) << 6) | (to_underlying(moveType) << 12)) {}
-    
-    constexpr uint16_t raw() const {
-        return data_;
-    }
-    constexpr bool operator==(const Move& other) const {
-        return data_ == other.data_;
-    }
-    constexpr bool operator!=(const Move& other) const {
-        return data_ != other.data_;
-    }
-    constexpr explicit operator bool() const {
-        return data_ != 0;
-    }
-    
-    constexpr Square from() const {
-        return static_cast<Square>(data_ & 63);
-    }
-    constexpr Square to() const {
-        return static_cast<Square>((data_ >> 6) & 63);
-    }
-    constexpr MoveType moveType() const {
-        return static_cast<MoveType>(data_ >> 12);
-    }
-    static constexpr Move none() {
-        return Move(0);
-    }
-    constexpr bool isNormal() const {
-        return (data_ >> 12) == to_underlying(MoveType::Normal); 
-    }
-    constexpr bool isCapture() const {
-        return data_ & (0b1000 << 12);
-    }
-    constexpr bool isPromotion() const {
-        return data_ & (0b0100 << 12);
-    }
+
+    constexpr uint16_t raw() const { return data_; }
+    constexpr bool operator==(const Move& other) const { return data_ == other.data_; }
+    constexpr bool operator!=(const Move& other) const { return data_ != other.data_; }
+    constexpr explicit operator bool() const { return data_ != 0; }
+
+    constexpr Square from() const { return static_cast<Square>(data_ & 63); }
+    constexpr Square to() const { return static_cast<Square>((data_ >> 6) & 63); }
+    constexpr MoveType moveType() const { return static_cast<MoveType>(data_ >> 12); }
+    static constexpr Move none() { return Move(0); }
+    constexpr bool isNormal() const { return (data_ >> 12) == to_underlying(MoveType::Normal); }
+    constexpr bool isCapture() const { return data_ & (0b1000 << 12); }
+    constexpr bool isPromotion() const { return data_ & (0b0100 << 12); }
     // Only call this if `isPromotion()` == true
     constexpr PieceType promotionType() const {
         return static_cast<PieceType>((data_ >> 12 & 0b0011) + to_underlying(PieceType::Knight));

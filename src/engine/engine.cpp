@@ -1,10 +1,10 @@
 #include <iostream>
 
-#include "util.h"
-#include "types.h"
-#include "zobrist.h"
-#include "position.h"
 #include "move_gen/attacks.h"
+#include "position.h"
+#include "types.h"
+#include "util.h"
+#include "zobrist.h"
 
 using namespace attacks;
 

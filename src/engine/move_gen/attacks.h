@@ -37,4 +37,4 @@ inline Bitboard pawn_attacks(Color c, Square sq) noexcept {
     return kPawnAttacksTable[to_underlying(c)][to_underlying(sq)];
 }
 
-} // namespace attacks
+}  // namespace attacks

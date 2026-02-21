@@ -9,23 +9,17 @@ struct Position {
         return pieces_[to_underlying(C)][to_underlying(PT) - 1];
     }
 
-    constexpr Bitboard get(Color c, PieceType pt) const {
-        return pieces_[to_underlying(c)][to_underlying(pt) - 1];
-    }
+    constexpr Bitboard get(Color c, PieceType pt) const { return pieces_[to_underlying(c)][to_underlying(pt) - 1]; }
 
-    constexpr Piece pieceOn(Square sq) const {
-        return pieceMap_[to_underlying(sq)];
-    }
+    constexpr Piece pieceOn(Square sq) const { return pieceMap_[to_underlying(sq)]; }
 
-    template<Color C>
+    template <Color C>
     constexpr Bitboard occupancy() const {
         static_assert(C < Color::Count);
         return colorOccupied_[to_underlying(C)];
     }
 
-    constexpr Bitboard occupancy() const {
-        return occupied_;
-    }
+    constexpr Bitboard occupancy() const { return occupied_; }
 
     // Recomputes occupancy bitboards (used during changes not reachable through move/unmove)
     void recomputeOccupancy() {
@@ -38,7 +32,7 @@ struct Position {
         }
         occupied_ = occupancy<Color::White>() | occupancy<Color::Black>();
     }
-    
+
 private:
     std::array<std::array<Bitboard, to_underlying(PieceType::Count) - 1>, to_underlying(Color::Count)> pieces_;
     std::array<Piece, 64> pieceMap_;
@@ -51,4 +45,4 @@ private:
     uint64_t hash_;
 };
 
-static_assert(sizeof(Position) == 200); // actual size is 197
+static_assert(sizeof(Position) == 200);  // actual size is 197
