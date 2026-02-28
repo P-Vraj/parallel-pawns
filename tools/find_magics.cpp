@@ -17,7 +17,6 @@ static inline uint64_t sparse_rand64(std::mt19937_64& rng) noexcept {
 }
 
 static Magic find_magic_for_square(
-    Square sq,
     Bitboard mask,
     int relevantBits,
     std::span<Bitboard> occs,
@@ -28,7 +27,7 @@ static Magic find_magic_for_square(
     std::vector<Bitboard> used(tableSize);
 
     while (true) {
-        Magic magic{mask, sparse_rand64(rng), static_cast<uint8_t>(64 - relevantBits)};
+        Magic magic{ mask, sparse_rand64(rng), static_cast<uint8_t>(64 - relevantBits) };
 
         std::fill(used.begin(), used.end(), 0ULL);
 
@@ -77,7 +76,7 @@ static std::array<Magic, 64> find_magics(PieceType pieceType) {
             atts.push_back(att);
         }
 
-        const Magic magic = find_magic_for_square(sq, mask, relevantBits, occs, atts, rng);
+        const Magic magic = find_magic_for_square(mask, relevantBits, occs, atts, rng);
         out[s] = magic;
     }
 
@@ -93,12 +92,8 @@ static std::string magics_to_string(std::string_view name, const std::array<Magi
         const Magic& m = arr[i];
 
         out += std::format(
-            "    {{ 0x{:016x}, 0x{:016x}, {} }}{}{}\n",
-            static_cast<uint64_t>(m.mask),
-            m.magic,
-            static_cast<unsigned>(m.shift),
-            (i == 63 ? "" : ","),
-            ""
+            "    {{ 0x{:016x}, 0x{:016x}, {} }}{}{}\n", static_cast<uint64_t>(m.mask), m.magic,
+            static_cast<unsigned>(m.shift), (i == 63 ? "" : ","), ""
         );
     }
 
