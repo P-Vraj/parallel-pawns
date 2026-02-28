@@ -3,6 +3,7 @@
 
 #include "../types.h"
 
+// Generates attack tables for non-sliding pieces (knights, kings, pawns) at compile-time.
 constexpr std::array<Bitboard, 64> generate_non_sliding_attacks_table(std::span<const std::pair<int, int>> deltas) {
     std::array<Bitboard, 64> attacks{};
 

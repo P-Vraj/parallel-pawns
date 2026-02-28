@@ -60,9 +60,10 @@ constexpr inline bool is_slider_for_direction(PieceType pt, Direction dir) noexc
 
 struct PinsInfo {
     Bitboard pinned = 0;
-    std::array<Bitboard, 64> pinRay;  // allowed destinations if pinned; ~0 if not pinned
+    std::array<Bitboard, 64> pinRay;  // Allowed destinations if pinned; ~0 if not pinned
 };
 
+// Computes pinned pieces and their corresponding pin rays for the given position and side to move.
 PinsInfo compute_pins(const Position& pos, Color us) noexcept {
     PinsInfo pins;
     pins.pinRay.fill(~Bitboard{ 0 });

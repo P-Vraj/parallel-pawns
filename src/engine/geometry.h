@@ -10,6 +10,7 @@ constexpr inline std::array<Direction, 8> kDirs = {
 
 namespace geom {
 
+// Checks if a piece on the given square can step in the given direction without going off the board
 constexpr inline bool can_step(Square sq, Direction dir) noexcept;
 
 // Initializes the line, between, and ray_pass tables.

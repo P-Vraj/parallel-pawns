@@ -59,6 +59,9 @@ constexpr inline Bitboard bishop_mask(Square sq) noexcept {
     return mask;
 }
 
+// These functions compute the sliding attacks for rooks and bishops given a square and blocker configuration
+// by simulating rays in each direction until a blocker is hit.
+
 constexpr inline Bitboard rook_attacks_ray(Square sq, Bitboard occupancy) noexcept {
     Bitboard attacks = 0;
     const int curFile = to_underlying(file(sq));
@@ -144,6 +147,9 @@ constexpr inline Bitboard index_to_occupancy(Bitboard magic_mask, size_t magic_i
     }
     return occ;
 }
+
+// Initializes the rook and bishop attack tables by iterating over all squares and all blocker configurations
+// Must occur at startup before move generation is used
 
 constexpr inline void init_rook_attacks_table() noexcept {
     for (size_t i = 0; i < 64; ++i) {
