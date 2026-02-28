@@ -1,6 +1,6 @@
 #pragma once
-#include "types.h"
 #include "checkers.h"
+#include "types.h"
 
 // List of moves, with a max size of 256 (max moves in any given position is 218)
 struct MoveList {

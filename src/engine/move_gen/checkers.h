@@ -24,12 +24,18 @@ inline bool is_square_attacked(const Position& pos, Square sq, Color by) noexcep
     const Color opp = ~by;
     const Bitboard occupied = pos.occupancy();
 
-    if (pawn_attacks(opp, sq) & pos.get(by, PieceType::Pawn)) return true;
-    if (knight_attacks(sq) & pos.get(by, PieceType::Knight)) return true;
-    if (bishop_attacks(sq, occupied) & pos.get(by, PieceType::Bishop)) return true;
-    if (rook_attacks(sq, occupied) & pos.get(by, PieceType::Rook)) return true;
-    if (queen_attacks(sq, occupied) & pos.get(by, PieceType::Queen)) return true;
-    if (king_attacks(sq) & pos.get(by, PieceType::King)) return true;
+    if (pawn_attacks(opp, sq) & pos.get(by, PieceType::Pawn))
+        return true;
+    if (knight_attacks(sq) & pos.get(by, PieceType::Knight))
+        return true;
+    if (bishop_attacks(sq, occupied) & pos.get(by, PieceType::Bishop))
+        return true;
+    if (rook_attacks(sq, occupied) & pos.get(by, PieceType::Rook))
+        return true;
+    if (queen_attacks(sq, occupied) & pos.get(by, PieceType::Queen))
+        return true;
+    if (king_attacks(sq) & pos.get(by, PieceType::King))
+        return true;
     return false;
 }
 
@@ -54,12 +60,12 @@ constexpr inline bool is_slider_for_direction(PieceType pt, Direction dir) noexc
 
 struct PinsInfo {
     Bitboard pinned = 0;
-    std::array<Bitboard, 64> pinRay; // allowed destinations if pinned; ~0 if not pinned
+    std::array<Bitboard, 64> pinRay;  // allowed destinations if pinned; ~0 if not pinned
 };
 
 PinsInfo compute_pins(const Position& pos, Color us) noexcept {
     PinsInfo pins;
-    pins.pinRay.fill(~Bitboard{0});
+    pins.pinRay.fill(~Bitboard{ 0 });
 
     const Color them = ~us;
     const Square kingSq = pos.kingSquare(us);
@@ -83,7 +89,7 @@ PinsInfo compute_pins(const Position& pos, Color us) noexcept {
                     continue;
                 }
                 else {
-                    break; // second friendly piece
+                    break;  // second friendly piece
                 }
             }
             else {
@@ -96,7 +102,8 @@ PinsInfo compute_pins(const Position& pos, Color us) noexcept {
                     while (can_step(t, dir)) {
                         t += dir;
                         ray |= bitboard(t);
-                        if (t == s) break;
+                        if (t == s)
+                            break;
                     }
 
                     pins.pinRay[to_underlying(candidate)] = ray;

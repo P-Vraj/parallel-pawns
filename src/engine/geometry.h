@@ -1,10 +1,12 @@
 #pragma once
 #include "types.h"
 
+// clang-format off
 constexpr inline std::array<Direction, 8> kDirs = {
     Direction::North, Direction::South, Direction::East, Direction::West,
     Direction::NorthEast, Direction::NorthWest, Direction::SouthEast, Direction::SouthWest
 };
+// clang-format on
 
 constexpr inline bool can_step(Square sq, Direction dir) noexcept;
 
