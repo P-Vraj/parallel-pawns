@@ -31,7 +31,7 @@ inline char to_char(PieceType pt) {
 }
 
 inline std::string to_string(Piece p) {
-    char pt = to_char(pieceType(p));
+    char pt = to_char(piece_type(p));
     if (color(p) == Color::White) {
         return std::string{ static_cast<char>(toupper(pt)) };
     }

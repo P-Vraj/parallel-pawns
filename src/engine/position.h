@@ -21,6 +21,12 @@ struct Position {
 
     constexpr Bitboard occupancy() const { return occupied_; }
 
+    constexpr Square kingSquare(Color c) const noexcept { return kingSquare_[to_underlying(c)]; }
+    constexpr Color sideToMove() const noexcept { return sideToMove_; }
+    constexpr Square epSquare() const noexcept { return enPassantSquare_; }
+    constexpr CastlingRights castlingRights() const noexcept { return castlingRights_; }
+    constexpr Key hash() const noexcept { return hash_; }
+
     // Recomputes occupancy bitboards (used during changes not reachable through move/unmove)
     void recomputeOccupancy() {
         for (size_t c = 0; c < to_underlying(Color::Count); ++c) {
@@ -42,7 +48,7 @@ private:
     Color sideToMove_;
     CastlingRights castlingRights_;
     Square enPassantSquare_;
-    uint64_t hash_;
+    Key hash_;
 };
 
 static_assert(sizeof(Position) == 200);  // actual size is 197
