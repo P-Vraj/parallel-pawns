@@ -67,6 +67,10 @@ constexpr inline Square& operator--(Square& sq) noexcept {
     return sq = static_cast<Square>(to_underlying(sq) - 1);
 }
 
+constexpr inline bool is_valid(Square sq) noexcept {
+    return to_underlying(sq) < to_underlying(Square::Count);
+}
+
 enum class File : uint8_t {
     A,
     B,
@@ -232,6 +236,8 @@ constexpr PieceType piece_type(Piece p) noexcept {
 }
 
 constexpr Piece make_piece(Color c, PieceType pt) noexcept {
+    if (pt == PieceType::None)
+        return Piece::None;
     return Piece(to_underlying(pt) + (to_underlying(c) * 8));
 }
 
@@ -248,6 +254,7 @@ enum class CastlingRights : uint8_t {
 };
 // clang-format on
 
+// NOLINTBEGIN(clang-analyzer-optin.core.EnumCastOutOfRange): Disable linting as CastlingRights is used as a bitfield
 constexpr CastlingRights operator|(CastlingRights a, CastlingRights b) {
     return static_cast<CastlingRights>(static_cast<uint8_t>(a) | static_cast<uint8_t>(b));
 }
@@ -263,6 +270,7 @@ constexpr CastlingRights& operator|=(CastlingRights& a, CastlingRights b) {
 constexpr CastlingRights& operator&=(CastlingRights& a, CastlingRights b) {
     return a = a & b;
 }
+// NOLINTEND(clang-analyzer-optin.core.EnumCastOutOfRange)
 
 // clang-format off
 enum class MoveType : uint8_t {
@@ -293,12 +301,13 @@ struct Move {
     // Bits 6-11:   To square
     // Bits 12-15:  Move type
 
+    constexpr Move() : data_(0) {}
     constexpr explicit Move(uint16_t data) : data_(data) {}
     constexpr Move(Square from, Square to) : data_(to_underlying(from) | (to_underlying(to) << 6)) {}
     constexpr Move(Square from, Square to, MoveType moveType)
         : data_(to_underlying(from) | (to_underlying(to) << 6) | (to_underlying(moveType) << 12)) {}
 
-    constexpr uint16_t raw() const { return data_; }
+    constexpr uint16_t data() const { return data_; }
     constexpr bool operator==(const Move& other) const { return data_ == other.data_; }
     constexpr bool operator!=(const Move& other) const { return data_ != other.data_; }
     constexpr explicit operator bool() const { return data_ != 0; }
@@ -306,7 +315,7 @@ struct Move {
     constexpr Square from() const { return static_cast<Square>(data_ & 63); }
     constexpr Square to() const { return static_cast<Square>((data_ >> 6) & 63); }
     constexpr MoveType moveType() const { return static_cast<MoveType>(data_ >> 12); }
-    static constexpr Move none() { return Move(0); }
+    static constexpr Move none() { return Move{}; }
     constexpr bool isNormal() const { return (data_ >> 12) == to_underlying(MoveType::Normal); }
     constexpr bool isCapture() const { return data_ & (0b1000 << 12); }
     constexpr bool isPromotion() const { return data_ & (0b0100 << 12); }

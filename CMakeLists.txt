@@ -1,4 +1,12 @@
 cmake_minimum_required(VERSION 3.20)
+
+# CCache support for faster rebuilds
+find_program(CCACHE_PROGRAM ccache)
+if(CCACHE_PROGRAM)
+  set(CMAKE_C_COMPILER_LAUNCHER   "${CCACHE_PROGRAM}")
+  set(CMAKE_CXX_COMPILER_LAUNCHER "${CCACHE_PROGRAM}")
+endif()
+
 project(parallel_pawns LANGUAGES CXX)
 
 # Options
@@ -27,15 +35,13 @@ if(ENABLE_NATIVE)
 endif()
 
 # Debug => -g -O0 -DDEBUG
-# Release => -O3 -DNDEBUG and LTO
+# Release => -O3 and LTO (NDEBUG is typically set by Release automatically)
+add_library(engine_opts INTERFACE)
 if(CMAKE_BUILD_TYPE STREQUAL "Debug")
-  add_compile_definitions(DEBUG)
-  add_library(engine_opts INTERFACE)
   target_compile_options(engine_opts INTERFACE -O0 -g)
+  add_compile_definitions(DEBUG)
 else()
-  add_library(engine_opts INTERFACE)
   target_compile_options(engine_opts INTERFACE -O3)
-  add_compile_definitions(NDEBUG)
 
   include(CheckIPOSupported)
   check_ipo_supported(RESULT ipo_supported OUTPUT ipo_err)
@@ -45,7 +51,7 @@ else()
 endif()
 
 # Engine executable
-file(GLOB ENGINE_SOURCES CONFIGURE_DEPENDS
+file(GLOB_RECURSE ENGINE_SOURCES CONFIGURE_DEPENDS
   "${CMAKE_SOURCE_DIR}/src/engine/*.cpp"
 )
 
@@ -55,26 +61,46 @@ target_include_directories(engine PRIVATE
 )
 target_link_libraries(engine PRIVATE engine_warnings engine_opts)
 
-set_target_properties(engine PROPERTIES
-  RUNTIME_OUTPUT_DIRECTORY "${CMAKE_SOURCE_DIR}/build"
-  OUTPUT_NAME "engine"
-)
-
 # Tools
 add_executable(find_magics tools/find_magics.cpp)
 target_include_directories(find_magics PRIVATE
   "${CMAKE_SOURCE_DIR}/src/engine"
 )
 target_link_libraries(find_magics PRIVATE engine_warnings engine_opts)
-set_target_properties(find_magics PROPERTIES
-  RUNTIME_OUTPUT_DIRECTORY "${CMAKE_SOURCE_DIR}/build"
+
+add_custom_target(run-find-magics
+  COMMAND $<TARGET_FILE:find_magics> > ${CMAKE_SOURCE_DIR}/src/engine/move_gen/magics_generated.h
+
+  COMMAND ${CLANG_FORMAT_EXE} -i ${CMAKE_SOURCE_DIR}/src/engine/move_gen/magics_generated.h
+  
+  DEPENDS find_magics
+  WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+  USES_TERMINAL
+  VERBATIM
 )
+
+# clang-tidy target
+find_program(CLANG_TIDY_EXE NAMES clang-tidy)
+if(CLANG_TIDY_EXE)
+  get_target_property(ENGINE_SRCS engine SOURCES)
+
+  add_custom_target(tidy
+    COMMAND ${CLANG_TIDY_EXE}
+            -p ${CMAKE_BINARY_DIR}
+            --quiet
+            --format-style=file
+            ${ENGINE_SRCS}
+    WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+    USES_TERMINAL
+    VERBATIM
+  )
+endif()
 
 # Convenience targets
 add_custom_target(run
-  COMMAND "${CMAKE_SOURCE_DIR}/build/engine"
+  COMMAND $<TARGET_FILE:engine>
   DEPENDS engine
-  WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}"
+  WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
 )
 
 # clang-format targets
