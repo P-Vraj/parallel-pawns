@@ -21,3 +21,5 @@ cmake --build build --target format     # Format with clang-format
 cmake --build build --target tidy       # Run clang-tidy
 clang-tidy -p build {FILE}              # Single tidy-file target
 ```
+
+You can find tool-specific build instructions within the files in `tools/`.

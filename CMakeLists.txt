@@ -68,6 +68,17 @@ target_include_directories(find_magics PRIVATE
 )
 target_link_libraries(find_magics PRIVATE engine_warnings engine_opts)
 
+add_custom_target(run-find-magics
+  COMMAND $<TARGET_FILE:find_magics> > ${CMAKE_SOURCE_DIR}/src/engine/move_gen/magics_generated.h
+
+  COMMAND ${CLANG_FORMAT_EXE} -i ${CMAKE_SOURCE_DIR}/src/engine/move_gen/magics_generated.h
+  
+  DEPENDS find_magics
+  WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+  USES_TERMINAL
+  VERBATIM
+)
+
 # clang-tidy target
 find_program(CLANG_TIDY_EXE NAMES clang-tidy)
 if(CLANG_TIDY_EXE)
