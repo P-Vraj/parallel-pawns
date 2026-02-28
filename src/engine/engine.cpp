@@ -26,5 +26,9 @@ int main() {
     std::cout << "Rook attacks:\n" << to_string(rook_attacks(Square::A1, blockers)) << '\n';
     std::cout << "Queen attacks:\n" << to_string(queen_attacks(Square::C1, blockers)) << '\n';
 
+    Position pos = Position::fromFEN("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1");
+    std::cout << "Position:\n";
+    std::cout << to_string(pos) << '\n';
+
     return 0;
 }

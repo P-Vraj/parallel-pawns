@@ -26,18 +26,10 @@ struct Position {
     constexpr Square epSquare() const noexcept { return enPassantSquare_; }
     constexpr CastlingRights castlingRights() const noexcept { return castlingRights_; }
     constexpr Key hash() const noexcept { return hash_; }
+    constexpr uint16_t fullmoveNumber() const noexcept { return fullmoveNumber_; }
+    constexpr uint8_t halfmoveClock() const noexcept { return halfmoveClock_; }
 
-    // Recomputes occupancy bitboards (used during changes not reachable through move/unmove)
-    void recomputeOccupancy() {
-        for (size_t c = 0; c < to_underlying(Color::Count); ++c) {
-            Bitboard occ = 0;
-            for (size_t pt = to_underlying(PieceType::Pawn); pt < to_underlying(PieceType::Count); ++pt) {
-                occ |= get(Color(c), PieceType(pt));
-            }
-            colorOccupied_[c] = occ;
-        }
-        occupied_ = occupancy<Color::White>() | occupancy<Color::Black>();
-    }
+    static Position fromFEN(std::string_view);
 
 private:
     std::array<std::array<Bitboard, to_underlying(PieceType::Count) - 1>, to_underlying(Color::Count)> pieces_;
@@ -45,10 +37,18 @@ private:
     std::array<Bitboard, to_underlying(Color::Count)> colorOccupied_;
     Bitboard occupied_;
     std::array<Square, to_underlying(Color::Count)> kingSquare_;
+    uint16_t fullmoveNumber_;
+    uint8_t halfmoveClock_;
     Color sideToMove_;
     CastlingRights castlingRights_;
     Square enPassantSquare_;
     Key hash_;
+
+    void parsePieceMap_(std::string_view placement) noexcept;
+    void parseCastlingRights_(std::string_view castling) noexcept;
+    void fillPieceBitboards_() noexcept;
+    // Recomputes occupancy bitboards (used during changes not reachable through move/unmove)
+    void recomputeOccupancy_() noexcept;
 };
 
-static_assert(sizeof(Position) == 200);  // actual size is 197
+static_assert(sizeof(Position) == 200);

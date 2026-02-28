@@ -70,6 +70,61 @@ inline std::string to_string(Bitboard b) {
     return out;
 }
 
+inline std::string to_string(const Position& pos) {
+    std::string divider = "+---+---+---+---+---+---+---+---+";
+    std::string out = divider + "\n";
+
+    for (int r = 7; r >= 0; --r) {
+        for (int f = 0; f < 8; ++f) {
+            Square sq = make_square(static_cast<File>(f), static_cast<Rank>(r));
+            Piece p = pos.pieceOn(sq);
+            out += "| " + to_string(p) + " ";
+        }
+        out += "| " + std::string{ static_cast<char>('1' + r) };
+        out += "\n" + divider + "\n";
+    }
+
+    out += "  a   b   c   d   e   f   g   h\n";
+    return out;
+}
+
+constexpr PieceType to_piece_type(char c) {
+    switch (tolower(c)) {
+        case 'p':
+            return PieceType::Pawn;
+        case 'n':
+            return PieceType::Knight;
+        case 'b':
+            return PieceType::Bishop;
+        case 'r':
+            return PieceType::Rook;
+        case 'q':
+            return PieceType::Queen;
+        case 'k':
+            return PieceType::King;
+        default:
+            return PieceType::None;
+    }
+}
+
+constexpr Piece to_piece(char c) {
+    if (c == '.' || c == '?') {
+        return Piece::None;
+    }
+    Color color = isupper(c) ? Color::White : Color::Black;
+    PieceType pt = to_piece_type(c);
+    return make_piece(color, pt);
+}
+
+constexpr Square to_square(std::string_view str) {
+    if (str == "0000") {
+        return Square::None;  // UCI nullmove
+    }
+    File f = static_cast<File>(tolower(str[0]) - 'a');
+    Rank r = static_cast<Rank>(str[1] - '1');
+    return make_square(f, r);
+}
+
 constexpr inline void set_bit(Bitboard& b, Square sq) noexcept {
     b |= bitboard(sq);
 }
