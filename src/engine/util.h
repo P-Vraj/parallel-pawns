@@ -6,10 +6,6 @@
 
 #include "types.h"
 
-inline std::string to_string(Color c) {
-    return c == Color::White ? "w" : "b";
-}
-
 inline char to_char(PieceType pt) {
     switch (pt) {
         case PieceType::Pawn:
@@ -30,8 +26,12 @@ inline char to_char(PieceType pt) {
     return '?';
 }
 
+inline std::string to_string(Color c) {
+    return c == Color::White ? "w" : "b";
+}
+
 inline std::string to_string(Piece p) {
-    char pt = to_char(pieceType(p));
+    char pt = to_char(piece_type(p));
     if (color(p) == Color::White) {
         return std::string{ static_cast<char>(toupper(pt)) };
     }
@@ -45,6 +45,22 @@ inline std::string to_string(Square sq) {
     char f = 'a' + to_underlying(file(sq));
     char r = '1' + to_underlying(rank(sq));
     return std::string{ f, r };
+}
+
+inline std::string to_string(CastlingRights cr) {
+    if (cr == CastlingRights::None) {
+        return "-";
+    }
+    std::string s{};
+    if ((cr & CastlingRights::WhiteKingside) != CastlingRights::None)
+        s += 'K';
+    if ((cr & CastlingRights::WhiteQueenside) != CastlingRights::None)
+        s += 'Q';
+    if ((cr & CastlingRights::BlackKingside) != CastlingRights::None)
+        s += 'k';
+    if ((cr & CastlingRights::BlackQueenside) != CastlingRights::None)
+        s += 'q';
+    return s;
 }
 
 // Long algebraic notation format
@@ -68,6 +84,61 @@ inline std::string to_string(Bitboard b) {
 
     out += "  a   b   c   d   e   f   g   h\n";
     return out;
+}
+
+inline std::string to_string(const Position& pos) {
+    std::string divider = "+---+---+---+---+---+---+---+---+";
+    std::string out = divider + "\n";
+
+    for (int r = 7; r >= 0; --r) {
+        for (int f = 0; f < 8; ++f) {
+            Square sq = make_square(static_cast<File>(f), static_cast<Rank>(r));
+            Piece p = pos.pieceOn(sq);
+            out += "| " + to_string(p) + " ";
+        }
+        out += "| " + std::string{ static_cast<char>('1' + r) };
+        out += "\n" + divider + "\n";
+    }
+
+    out += "  a   b   c   d   e   f   g   h\n";
+    return out;
+}
+
+constexpr PieceType to_piece_type(char c) {
+    switch (tolower(c)) {
+        case 'p':
+            return PieceType::Pawn;
+        case 'n':
+            return PieceType::Knight;
+        case 'b':
+            return PieceType::Bishop;
+        case 'r':
+            return PieceType::Rook;
+        case 'q':
+            return PieceType::Queen;
+        case 'k':
+            return PieceType::King;
+        default:
+            return PieceType::None;
+    }
+}
+
+constexpr Piece to_piece(char c) {
+    if (c == '.' || c == '?') {
+        return Piece::None;
+    }
+    Color color = isupper(c) ? Color::White : Color::Black;
+    PieceType pt = to_piece_type(c);
+    return make_piece(color, pt);
+}
+
+constexpr Square to_square(std::string_view str) {
+    if (str == "0000") {
+        return Square::None;  // UCI nullmove
+    }
+    File f = static_cast<File>(tolower(str[0]) - 'a');
+    Rank r = static_cast<Rank>(str[1] - '1');
+    return make_square(f, r);
 }
 
 constexpr inline void set_bit(Bitboard& b, Square sq) noexcept {

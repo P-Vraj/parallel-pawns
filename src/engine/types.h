@@ -84,7 +84,7 @@ constexpr File file(Square sq) noexcept {
     return File(to_underlying(sq) % 8);
 }
 
-constexpr bool isValid(File f) noexcept {
+constexpr bool is_valid(File f) noexcept {
     return to_underlying(f) < to_underlying(File::Count);
 }
 
@@ -138,7 +138,7 @@ constexpr Rank rank(Square sq) noexcept {
     return Rank(to_underlying(sq) / 8);
 }
 
-constexpr bool isValid(Rank r) noexcept {
+constexpr bool is_valid(Rank r) noexcept {
     return to_underlying(r) < to_underlying(Rank::Count);
 }
 
@@ -178,8 +178,8 @@ constexpr Square make_square(File f, Rank r) noexcept {
     return Square(to_underlying(f) | (to_underlying(r) << 3));
 }
 
-constexpr bool isValid(File f, Rank r) noexcept {
-    return isValid(f) && isValid(r);
+constexpr bool is_valid(File f, Rank r) noexcept {
+    return is_valid(f) && is_valid(r);
 }
 
 constexpr inline Bitboard bitboard(Square sq) noexcept {
@@ -219,11 +219,15 @@ enum class Piece : uint8_t {
 };
 // clang-format on
 
+constexpr bool is_empty(Piece p) noexcept {
+    return p == Piece::None;
+}
+
 constexpr Color color(Piece p) noexcept {
     return Color(to_underlying(p) / 8);
 }
 
-constexpr PieceType pieceType(Piece p) noexcept {
+constexpr PieceType piece_type(Piece p) noexcept {
     return PieceType(to_underlying(p) % 8);
 }
 
