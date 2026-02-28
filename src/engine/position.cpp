@@ -21,14 +21,14 @@ constexpr std::array<uint8_t, 64> make_castle_mask() {
     return mask;
 }
 
-static constexpr std::array<uint8_t, 64> kCastleMask = make_castle_mask();
+constexpr std::array<uint8_t, 64> kCastleMask = make_castle_mask();
 }  // namespace
 
 Position Position::fromFEN(std::string_view fen) {
     Position pos{};
     std::vector<std::string_view> fields;
     for (auto field : fen | std::views::split(' ')) {
-        fields.emplace_back(std::string_view(&*field.begin(), std::ranges::distance(field)));
+        fields.emplace_back(&*field.begin(), std::ranges::distance(field));
     }
 
     pos.parsePieceMap_(fields[0]);
@@ -86,7 +86,7 @@ void Position::parsePieceMap_(std::string_view placement) noexcept {
     int rank = 7;
     int file = 0;
 
-    for (char c : placement) {
+    for (const char c : placement) {
         if (c == '/') {
             rank--;
             file = 0;
@@ -96,8 +96,8 @@ void Position::parsePieceMap_(std::string_view placement) noexcept {
             file += (c - '0');
             continue;
         }
-        Piece piece = to_piece(c);
-        Square sq = make_square(static_cast<File>(file), static_cast<Rank>(rank));
+        const Piece piece = to_piece(c);
+        const Square sq = make_square(static_cast<File>(file), static_cast<Rank>(rank));
 
         pieceMap_[to_underlying(sq)] = piece;
         file++;
@@ -106,7 +106,7 @@ void Position::parsePieceMap_(std::string_view placement) noexcept {
 
 void Position::parseCastlingRights_(std::string_view castling) noexcept {
     castlingRights_ = CastlingRights::None;
-    for (char c : castling) {
+    for (const char c : castling) {
         switch (c) {
             case 'K':
                 castlingRights_ |= CastlingRights::WhiteKingside;
@@ -129,12 +129,12 @@ void Position::parseCastlingRights_(std::string_view castling) noexcept {
 
 void Position::fillBitboards_() noexcept {
     for (size_t sq = 0; sq < 64; ++sq) {
-        Piece piece = pieceMap_[sq];
+        const Piece piece = pieceMap_[sq];
         if (piece == Piece::None)
             continue;
 
-        Color c = color(piece);
-        PieceType pt = piece_type(piece);
+        const Color c = color(piece);
+        const PieceType pt = piece_type(piece);
         set_bit(pieces_[to_underlying(c)][to_underlying(pt) - 1], static_cast<Square>(sq));
         set_bit(colorOccupied_[to_underlying(c)], static_cast<Square>(sq));
         set_bit(occupied_, static_cast<Square>(sq));

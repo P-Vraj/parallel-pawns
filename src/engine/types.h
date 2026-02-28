@@ -232,6 +232,8 @@ constexpr PieceType piece_type(Piece p) noexcept {
 }
 
 constexpr Piece make_piece(Color c, PieceType pt) noexcept {
+    if (pt == PieceType::None)
+        return Piece::None;
     return Piece(to_underlying(pt) + (to_underlying(c) * 8));
 }
 
@@ -248,6 +250,7 @@ enum class CastlingRights : uint8_t {
 };
 // clang-format on
 
+// NOLINTBEGIN(clang-analyzer-optin.core.EnumCastOutOfRange): Disable linting as CastlingRights is used as a bitfield
 constexpr CastlingRights operator|(CastlingRights a, CastlingRights b) {
     return static_cast<CastlingRights>(static_cast<uint8_t>(a) | static_cast<uint8_t>(b));
 }
@@ -263,6 +266,7 @@ constexpr CastlingRights& operator|=(CastlingRights& a, CastlingRights b) {
 constexpr CastlingRights& operator&=(CastlingRights& a, CastlingRights b) {
     return a = a & b;
 }
+// NOLINTEND(clang-analyzer-optin.core.EnumCastOutOfRange)
 
 // clang-format off
 enum class MoveType : uint8_t {

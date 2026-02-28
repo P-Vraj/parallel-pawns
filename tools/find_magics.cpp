@@ -11,19 +11,22 @@
 #include "../src/engine/types.h"
 #include "../src/engine/util.h"
 
-static inline uint64_t sparse_rand64(std::mt19937_64& rng) noexcept {
+namespace {
+
+inline uint64_t sparse_rand64(std::mt19937_64& rng) noexcept {
     // Sparse randoms (few bits set) are more likely to produce good magic numbers
+    // NOLINTNEXTLINE(misc-redundant-expression): We intentionally AND multiple rands together
     return rng() & rng() & rng();
 }
 
-static Magic find_magic_for_square(
+Magic find_magic_for_square(
     Bitboard mask,
     int relevantBits,
     std::span<Bitboard> occs,
     std::span<Bitboard> atts,
     std::mt19937_64& rng
 ) {
-    const size_t tableSize = 1u << relevantBits;
+    const size_t tableSize = 1U << relevantBits;
     std::vector<Bitboard> used(tableSize);
 
     while (true) {
@@ -50,7 +53,7 @@ static Magic find_magic_for_square(
     }
 }
 
-static std::array<Magic, 64> find_magics(PieceType pieceType) {
+std::array<Magic, 64> find_magics(PieceType pieceType) {
     std::array<Magic, 64> out{};
 
     std::random_device rd;
@@ -59,10 +62,10 @@ static std::array<Magic, 64> find_magics(PieceType pieceType) {
     const bool isRook = pieceType == PieceType::Rook;
 
     for (size_t s = 0; s < 64; ++s) {
-        const Square sq = static_cast<Square>(s);
+        const auto sq = static_cast<Square>(s);
         const Bitboard mask = isRook ? rook_mask(sq) : bishop_mask(sq);
         const int relevantBits = bit_count(mask);
-        const size_t count = 1u << relevantBits;
+        const size_t count = 1U << relevantBits;
 
         std::vector<Bitboard> occs;
         std::vector<Bitboard> atts;
@@ -83,7 +86,7 @@ static std::array<Magic, 64> find_magics(PieceType pieceType) {
     return out;
 }
 
-static std::string magics_to_string(std::string_view name, const std::array<Magic, 64>& arr) {
+std::string magics_to_string(std::string_view name, const std::array<Magic, 64>& arr) {
     std::string out{};
 
     out += std::format("constexpr inline std::array<Magic, 64> {} = {{{{\n", name);
@@ -101,13 +104,15 @@ static std::string magics_to_string(std::string_view name, const std::array<Magi
     return out;
 }
 
-static std::string header_to_string() {
+std::string header_to_string() {
     std::string header{};
     header += "#pragma once\n";
     header += "#include <array>\n";
     header += "#include \"magic_types.h\"\n";
     return header;
 }
+
+}  // namespace
 
 int main() {
     auto rookMagics = find_magics(PieceType::Rook);

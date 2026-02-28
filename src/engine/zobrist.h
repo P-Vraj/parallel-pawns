@@ -8,6 +8,6 @@ extern std::array<Key, to_underlying(CastlingRights::Count)> castling;
 extern std::array<Key, 8> enPassantFile;
 extern Key side;
 
-void init(uint64_t seed = 0x9E3779B97F4A7C15ULL) noexcept;
+void init_zobrist(uint64_t seed = 0x9E3779B97F4A7C15ULL) noexcept;
 
 }  // namespace zobrist

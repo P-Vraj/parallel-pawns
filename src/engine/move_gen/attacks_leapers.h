@@ -7,11 +7,11 @@ constexpr std::array<Bitboard, 64> generate_non_sliding_attacks_table(std::span<
     std::array<Bitboard, 64> attacks{};
 
     for (size_t i = 0; i < 64; ++i) {
-        Square sq = static_cast<Square>(i);
+        auto sq = static_cast<Square>(i);
         Bitboard attacksBitboard = 0;
         for (const auto& [dr, df] : deltas) {
-            File f = file(sq) + df;
-            Rank r = rank(sq) + dr;
+            const File f = file(sq) + df;
+            const Rank r = rank(sq) + dr;
             if (is_valid(f, r)) {
                 attacksBitboard |= bitboard(make_square(f, r));
             }

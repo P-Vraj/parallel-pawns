@@ -44,17 +44,19 @@ constexpr inline bool can_step(Square sq, Direction dir) noexcept {
 void init_geometry_tables() noexcept {
     using namespace attacks;
     for (size_t i = 0; i < 64; ++i) {
-        const Square from = static_cast<Square>(i);
+        const auto from = static_cast<Square>(i);
         const Bitboard fromBB = bitboard(from);
 
         const Bitboard orthogonalFrom = rook_attacks(from, 0);
         const Bitboard diagonalFrom = bishop_attacks(from, 0);
 
         for (size_t j = 0; j < 64; ++j) {
-            const Square to = static_cast<Square>(j);
+            const auto to = static_cast<Square>(j);
             const Bitboard toBB = bitboard(to);
 
-            Bitboard line = 0, between = 0, rayPass = 0;
+            Bitboard line = 0;
+            Bitboard between = 0;
+            Bitboard rayPass = 0;
             if (orthogonalFrom & toBB) {
                 const Bitboard orthogonalTo = rook_attacks(to, 0);
 

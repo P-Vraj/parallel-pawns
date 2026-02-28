@@ -75,7 +75,7 @@ PinsInfo compute_pins(const Position& pos, Color us) noexcept {
         Square candidate = Square::None;
         bool foundFriendly = false;
 
-        while (can_step(s, dir)) {
+        while (geom::can_step(s, dir)) {
             s += dir;
             Piece p = pos.pieceOn(s);
 
@@ -88,18 +88,17 @@ PinsInfo compute_pins(const Position& pos, Color us) noexcept {
                     candidate = s;
                     continue;
                 }
-                else {
-                    break;  // second friendly piece
-                }
+                else
+                    break;
             }
             else {
                 if (foundFriendly && is_slider_for_direction(piece_type(p), dir)) {
                     pins.pinned |= bitboard(candidate);
 
-                    // build ray from king to pinner
+                    // Build ray from king to pinner
                     Bitboard ray = 0;
                     Square t = kingSq;
-                    while (can_step(t, dir)) {
+                    while (geom::can_step(t, dir)) {
                         t += dir;
                         ray |= bitboard(t);
                         if (t == s)

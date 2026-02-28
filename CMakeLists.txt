@@ -27,15 +27,13 @@ if(ENABLE_NATIVE)
 endif()
 
 # Debug => -g -O0 -DDEBUG
-# Release => -O3 -DNDEBUG and LTO
+# Release => -O3 and LTO (NDEBUG is typically set by Release automatically)
+add_library(engine_opts INTERFACE)
 if(CMAKE_BUILD_TYPE STREQUAL "Debug")
-  add_compile_definitions(DEBUG)
-  add_library(engine_opts INTERFACE)
   target_compile_options(engine_opts INTERFACE -O0 -g)
+  add_compile_definitions(DEBUG)
 else()
-  add_library(engine_opts INTERFACE)
   target_compile_options(engine_opts INTERFACE -O3)
-  add_compile_definitions(NDEBUG)
 
   include(CheckIPOSupported)
   check_ipo_supported(RESULT ipo_supported OUTPUT ipo_err)
@@ -55,26 +53,35 @@ target_include_directories(engine PRIVATE
 )
 target_link_libraries(engine PRIVATE engine_warnings engine_opts)
 
-set_target_properties(engine PROPERTIES
-  RUNTIME_OUTPUT_DIRECTORY "${CMAKE_SOURCE_DIR}/build"
-  OUTPUT_NAME "engine"
-)
-
 # Tools
 add_executable(find_magics tools/find_magics.cpp)
 target_include_directories(find_magics PRIVATE
   "${CMAKE_SOURCE_DIR}/src/engine"
 )
 target_link_libraries(find_magics PRIVATE engine_warnings engine_opts)
-set_target_properties(find_magics PROPERTIES
-  RUNTIME_OUTPUT_DIRECTORY "${CMAKE_SOURCE_DIR}/build"
-)
+
+# clang-tidy target
+find_program(CLANG_TIDY_EXE NAMES clang-tidy)
+if(CLANG_TIDY_EXE)
+  get_target_property(ENGINE_SRCS engine SOURCES)
+
+  add_custom_target(tidy
+    COMMAND ${CLANG_TIDY_EXE}
+            -p ${CMAKE_BINARY_DIR}
+            --quiet
+            --format-style=file
+            ${ENGINE_SRCS}
+    WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+    USES_TERMINAL
+    VERBATIM
+  )
+endif()
 
 # Convenience targets
 add_custom_target(run
-  COMMAND "${CMAKE_SOURCE_DIR}/build/engine"
+  COMMAND $<TARGET_FILE:engine>
   DEPENDS engine
-  WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}"
+  WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
 )
 
 # clang-format targets
