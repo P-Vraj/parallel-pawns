@@ -33,9 +33,9 @@ inline char to_char(PieceType pt) {
 inline std::string to_string(Piece p) {
     char pt = to_char(pieceType(p));
     if (color(p) == Color::White) {
-        return std::string{static_cast<char>(toupper(pt))};
+        return std::string{ static_cast<char>(toupper(pt)) };
     }
-    return std::string{pt};
+    return std::string{ pt };
 }
 
 inline std::string to_string(Square sq) {
@@ -44,12 +44,13 @@ inline std::string to_string(Square sq) {
     }
     char f = 'a' + to_underlying(file(sq));
     char r = '1' + to_underlying(rank(sq));
-    return std::string{f, r};
+    return std::string{ f, r };
 }
 
 // Long algebraic notation format
 inline std::string to_string(Move m) {
-    return to_string(m.from()) + to_string(m.to()) + (m.isPromotion() ? std::string{to_char(m.promotionType())} : "");
+    std::string promo = m.isPromotion() ? std::string{ to_char(m.promotionType()) } : "";
+    return to_string(m.from()) + to_string(m.to()) + promo;
 }
 
 inline std::string to_string(Bitboard b) {
@@ -61,7 +62,7 @@ inline std::string to_string(Bitboard b) {
             Square sq = make_square(static_cast<File>(f), static_cast<Rank>(r));
             out += (b & bitboard(sq)) ? "| * " : "|   ";
         }
-        out += "| " + std::string{static_cast<char>('1' + r)};
+        out += "| " + std::string{ static_cast<char>('1' + r) };
         out += "\n" + divider + "\n";
     }
 
