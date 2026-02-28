@@ -23,6 +23,10 @@ Checks: >
   -cppcoreguidelines-avoid-non-const-global-variables,
   -cppcoreguidelines-narrowing-conversions,
   -bugprone-easily-swappable-parameters,
+  -bugprone-exception-escape,
+  -portability-avoid-pragma-once,
+  -modernize-use-designated-initializers,
+  -readability-enum-initial-value,
 
   # Reenabled checks:
   # -clang-analyzer-optin.core.EnumCastOutOfRange,

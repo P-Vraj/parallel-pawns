@@ -69,34 +69,33 @@ PinsInfo compute_pins(const Position& pos, Color us) noexcept {
 
     const Square kingSq = pos.kingSquare(us);
 
-    for (const Direction dir : geom::kDirections) {
-        Square sq = kingSq;
+    auto scan_direction = [&](Direction dir) noexcept {
         Square candidate = Square::None;
-
-        while (geom::can_step(sq, dir)) {
-            sq += dir;
+        for (Square sq = geom::step(kingSq, dir); is_valid(sq); sq = geom::step(sq, dir)) {
             const Piece p = pos.pieceOn(sq);
-
             if (is_empty(p))
                 continue;
 
+            // Check if the piece is a friendly piece blocking the pin
             if (color(p) == us) {
                 if (!is_valid(candidate)) {
                     candidate = sq;
                     continue;
                 }
-                else
-                    break;
+                return;
             }
-            else {
-                if (is_valid(candidate) && is_slider_for_direction(piece_type(p), dir)) {
-                    pins.pinned |= bitboard(candidate);
-                    // Build ray from king to pinner
-                    pins.pinRay[to_underlying(candidate)] = geom::between_or_to(kingSq, sq);
-                }
-                break;
+            // If enemy piece found that slides in this direction, it's a pin
+            if (is_valid(candidate) && is_slider_for_direction(piece_type(p), dir)) {
+                pins.pinned |= bitboard(candidate);
+                // Build ray from king to pinner
+                pins.pinRay[to_underlying(candidate)] = geom::between_or_to(kingSq, sq);
             }
+            return;
         }
+    };
+
+    for (const Direction dir : geom::kDirections) {
+        scan_direction(dir);
     }
 
     return pins;

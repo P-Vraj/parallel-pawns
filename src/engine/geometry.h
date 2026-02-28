@@ -10,6 +10,10 @@ constexpr inline Bitboard kRank1 = 0x00000000000000FFULL;
 constexpr inline Bitboard kRank8 = 0xFF00000000000000ULL;
 };  // namespace internal
 
+extern std::array<std::array<Bitboard, 64>, 64> line_table;
+extern std::array<std::array<Bitboard, 64>, 64> between_table;
+extern std::array<std::array<Bitboard, 64>, 64> ray_pass_table;
+
 // clang-format off
 constexpr inline std::array<Direction, 8> kDirections = {
     Direction::North, Direction::South, Direction::East, Direction::West,
@@ -17,12 +21,29 @@ constexpr inline std::array<Direction, 8> kDirections = {
 };
 // clang-format on
 
-extern std::array<std::array<Bitboard, 64>, 64> line_table;
-extern std::array<std::array<Bitboard, 64>, 64> between_table;
-extern std::array<std::array<Bitboard, 64>, 64> ray_pass_table;
-
-// Initializes the line, between, and ray_pass tables.
-void init_geometry_tables() noexcept;
+// Map Direction to an index from 0-7 for table lookups
+constexpr inline size_t direction_index(Direction dir) noexcept {
+    switch (dir) {
+        case Direction::North:
+            return 0;
+        case Direction::South:
+            return 1;
+        case Direction::East:
+            return 2;
+        case Direction::West:
+            return 3;
+        case Direction::NorthEast:
+            return 4;
+        case Direction::NorthWest:
+            return 5;
+        case Direction::SouthEast:
+            return 6;
+        case Direction::SouthWest:
+            return 7;
+        default:
+            return 8;  // Invalid direction index
+    }
+}
 // Checks if a piece on the given square can step in the given direction without going off the board
 constexpr bool can_step(Square sq, Direction dir) noexcept {
     const Bitboard bb = bitboard(sq);
@@ -47,6 +68,44 @@ constexpr bool can_step(Square sq, Direction dir) noexcept {
             return false;
     }
 }
+constexpr inline std::array<std::array<Square, 8>, 64> make_step_table() noexcept {
+    std::array<std::array<Square, 8>, 64> stepTable{};
+
+    constexpr auto step_in_direction = [](Square sq, Direction dir) noexcept {
+        const int s = static_cast<int>(to_underlying(sq));
+        const int d = static_cast<int>(to_underlying(dir));  // NOLINT(bugprone-signed-char-misuse): Safe/intentional
+        const int file = s & 7;
+        // Prevent horizontal wraparound
+        if ((d == +1 || d == +9 || d == -7) && file == 7)
+            return Square::None;
+        if ((d == -1 || d == +7 || d == -9) && file == 0)
+            return Square::None;
+        const int next_step = s + d;
+        return (next_step >= 0 && next_step < 64) ? static_cast<Square>(next_step) : Square::None;
+    };
+
+    for (auto& row : stepTable) {
+        row.fill(Square::None);
+    }
+
+    for (int s = 0; s < 64; ++s) {
+        const auto sq = static_cast<Square>(s);
+        for (const Direction dir : kDirections) {
+            stepTable[s][direction_index(dir)] = step_in_direction(sq, dir);
+        }
+    }
+
+    return stepTable;
+}
+
+constexpr inline std::array<std::array<Square, 8>, 64> kStepTable = make_step_table();
+// Steps from the given square in the given direction, or returns Square::None if stepping goes off the board.
+constexpr inline Square step(Square sq, Direction dir) noexcept {
+    return kStepTable[to_underlying(sq)][direction_index(dir)];
+}
+
+// Initializes the line, between, and ray_pass tables.
+void init_geometry_tables() noexcept;
 // Returns bitboard of squares strictly between a and b (excluding a and b), or 0 if a and b are not aligned.
 inline Bitboard between(Square a, Square b) noexcept {
     return between_table[to_underlying(a)][to_underlying(b)];

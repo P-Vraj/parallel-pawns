@@ -1,7 +1,8 @@
 #pragma once
+#include "../position.h"
+#include "../util.h"
 #include "attacks.h"
 #include "geometry.h"
-#include "util.h"
 
 // List of moves, with a max size of 256 (max moves in any given position is known to be 218)
 struct MoveList {
@@ -56,3 +57,5 @@ bool is_square_attacked(const Position& pos, Square sq, Color by) noexcept;
 PinsInfo compute_pins(const Position& pos, Color us) noexcept;
 // Generates all legal moves for the given position and appends them to the move list.
 void generate_moves(const Position& pos, MoveList& moveList) noexcept;
+// Generates legal king moves and appends them to the move list.
+void king_moves(const Position& pos, MoveList& moveList) noexcept;
