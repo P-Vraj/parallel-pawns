@@ -47,6 +47,22 @@ inline std::string to_string(Square sq) {
     return std::string{ f, r };
 }
 
+inline std::string to_string(CastlingRights cr) {
+    if (cr == CastlingRights::None) {
+        return "-";
+    }
+    std::string s;
+    if ((cr & CastlingRights::WhiteKingside) != CastlingRights::None)
+        s += 'K';
+    if ((cr & CastlingRights::WhiteQueenside) != CastlingRights::None)
+        s += 'Q';
+    if ((cr & CastlingRights::BlackKingside) != CastlingRights::None)
+        s += 'k';
+    if ((cr & CastlingRights::BlackQueenside) != CastlingRights::None)
+        s += 'q';
+    return s;
+}
+
 // Long algebraic notation format
 inline std::string to_string(Move m) {
     std::string promo = m.isPromotion() ? std::string{ to_char(m.promotionType()) } : "";

@@ -48,6 +48,42 @@ Position Position::fromFEN(std::string_view fen) {
     return pos;
 }
 
+std::string Position::toFEN() const {
+    std::string fen;
+
+    for (int r = 7; r >= 0; --r) {
+        int emptyCount = 0;
+        for (int f = 0; f < 8; ++f) {
+            Square sq = make_square(static_cast<File>(f), static_cast<Rank>(r));
+            Piece p = pieceOn(sq);
+            if (p == Piece::None) {
+                emptyCount++;
+            }
+            else {
+                if (emptyCount > 0) {
+                    fen += std::to_string(emptyCount);
+                    emptyCount = 0;
+                }
+                fen += to_string(p);
+            }
+        }
+        if (emptyCount > 0) {
+            fen += std::to_string(emptyCount);
+        }
+        if (r > 0) {
+            fen += '/';
+        }
+    }
+    fen += ' ';
+
+    fen += std::format("{} ", (sideToMove() == Color::White) ? 'w' : 'b');
+    fen += std::format("{} ", to_string(castlingRights()));
+    fen += std::format("{} ", (epSquare() == Square::None) ? "-" : to_string(epSquare()));
+    fen += std::format("{} {}", halfmoveClock(), fullmoveNumber());
+
+    return fen;
+}
+
 void Position::parsePieceMap_(std::string_view placement) noexcept {
     int rank = 7;
     int file = 0;

@@ -30,6 +30,7 @@ struct Position {
     constexpr uint8_t halfmoveClock() const noexcept { return halfmoveClock_; }
 
     static Position fromFEN(std::string_view);
+    std::string toFEN() const;
 
 private:
     std::array<std::array<Bitboard, to_underlying(PieceType::Count) - 1>, to_underlying(Color::Count)> pieces_;

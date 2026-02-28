@@ -26,9 +26,18 @@ int main() {
     std::cout << "Rook attacks:\n" << to_string(rook_attacks(Square::A1, blockers)) << '\n';
     std::cout << "Queen attacks:\n" << to_string(queen_attacks(Square::C1, blockers)) << '\n';
 
-    Position pos = Position::fromFEN("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1");
+    std::string startFEN = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
+    std::string testFEN = "rnbqkbnr/pp1ppppp/8/2p5/4P3/5N2/PPPP1PPP/RNBQKB1R b Kkq - 1 2";
+
+    Position pos = Position::fromFEN(startFEN);
     std::cout << "Position:\n";
     std::cout << to_string(pos) << '\n';
+    std::cout << "FEN: " << pos.toFEN() << '\n';
+
+    Position pos2 = Position::fromFEN(testFEN);
+    if (pos2.toFEN() == testFEN) {
+        std::cout << "FEN round-trip successful!\n";
+    }
 
     return 0;
 }
