@@ -51,7 +51,7 @@ else()
 endif()
 
 # Engine executable
-file(GLOB ENGINE_SOURCES CONFIGURE_DEPENDS
+file(GLOB_RECURSE ENGINE_SOURCES CONFIGURE_DEPENDS
   "${CMAKE_SOURCE_DIR}/src/engine/*.cpp"
 )
 

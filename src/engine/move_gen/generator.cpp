@@ -1,10 +1,34 @@
-#pragma once
-#include "attacks.h"
-#include "geometry.h"
-#include "position.h"
-#include "util.h"
+#include "generator.h"
 
-inline Bitboard checkers(const Position& pos, Color us) noexcept {
+namespace {
+
+struct Context {
+    Color us{}, them{};
+    Square ksq{};
+    Bitboard occ{}, usOcc{}, themOcc{};
+    Bitboard checkers{};
+    int numCheckers{};
+    PinsInfo pins{};
+    Bitboard evasionMask{};
+};
+
+// Generates the evasion mask for a king in check by a single piece.
+Bitboard evasion_mask_single(const Position& pos, Square kingSq, Bitboard checkers) noexcept {
+    const auto checkerSq = static_cast<Square>(get_lsb(checkers));
+    const Piece checkerPiece = pos.pieceOn(checkerSq);
+    const PieceType pt = piece_type(checkerPiece);
+
+    // Either the checker can be captured, or if it's a slider, it can be blocked.
+    Bitboard mask = bitboard(checkerSq);
+    if (pt == PieceType::Bishop || pt == PieceType::Rook || pt == PieceType::Queen)
+        mask |= geom::between(kingSq, checkerSq);
+
+    return mask;
+}
+
+}  // namespace
+
+Bitboard checkers(const Position& pos, Color us) noexcept {
     using namespace attacks;
     const Color opp = ~us;
     const Square kingSq = pos.kingSquare(us);
@@ -19,7 +43,7 @@ inline Bitboard checkers(const Position& pos, Color us) noexcept {
     return checkers;
 }
 
-inline bool is_square_attacked(const Position& pos, Square sq, Color by) noexcept {
+bool is_square_attacked(const Position& pos, Square sq, Color by) noexcept {
     using namespace attacks;
     const Color opp = ~by;
     const Bitboard occupied = pos.occupancy();
@@ -39,74 +63,36 @@ inline bool is_square_attacked(const Position& pos, Square sq, Color by) noexcep
     return false;
 }
 
-constexpr inline bool is_slider_for_direction(PieceType pt, Direction dir) noexcept {
-    switch (dir) {
-        case Direction::North:
-        case Direction::South:
-        case Direction::East:
-        case Direction::West:
-            return pt == PieceType::Rook || pt == PieceType::Queen;
-
-        case Direction::NorthEast:
-        case Direction::NorthWest:
-        case Direction::SouthEast:
-        case Direction::SouthWest:
-            return pt == PieceType::Bishop || pt == PieceType::Queen;
-
-        default:
-            return false;
-    }
-}
-
-struct PinsInfo {
-    Bitboard pinned = 0;
-    std::array<Bitboard, 64> pinRay;  // Allowed destinations if pinned; ~0 if not pinned
-};
-
-// Computes pinned pieces and their corresponding pin rays for the given position and side to move.
 PinsInfo compute_pins(const Position& pos, Color us) noexcept {
     PinsInfo pins;
     pins.pinRay.fill(~Bitboard{ 0 });
 
-    const Color them = ~us;
     const Square kingSq = pos.kingSquare(us);
 
-    for (Direction dir : kDirs) {
-        Square s = kingSq;
+    for (const Direction dir : geom::kDirections) {
+        Square sq = kingSq;
         Square candidate = Square::None;
-        bool foundFriendly = false;
 
-        while (geom::can_step(s, dir)) {
-            s += dir;
-            Piece p = pos.pieceOn(s);
+        while (geom::can_step(sq, dir)) {
+            sq += dir;
+            const Piece p = pos.pieceOn(sq);
 
             if (is_empty(p))
                 continue;
 
             if (color(p) == us) {
-                if (!foundFriendly) {
-                    foundFriendly = true;
-                    candidate = s;
+                if (!is_valid(candidate)) {
+                    candidate = sq;
                     continue;
                 }
                 else
                     break;
             }
             else {
-                if (foundFriendly && is_slider_for_direction(piece_type(p), dir)) {
+                if (is_valid(candidate) && is_slider_for_direction(piece_type(p), dir)) {
                     pins.pinned |= bitboard(candidate);
-
                     // Build ray from king to pinner
-                    Bitboard ray = 0;
-                    Square t = kingSq;
-                    while (geom::can_step(t, dir)) {
-                        t += dir;
-                        ray |= bitboard(t);
-                        if (t == s)
-                            break;
-                    }
-
-                    pins.pinRay[to_underlying(candidate)] = ray;
+                    pins.pinRay[to_underlying(candidate)] = geom::between_or_to(kingSq, sq);
                 }
                 break;
             }
@@ -115,3 +101,7 @@ PinsInfo compute_pins(const Position& pos, Color us) noexcept {
 
     return pins;
 }
+
+void generate_moves(const Position& pos, MoveList& moveList) noexcept {}
+
+void king_moves(const Position& pos, MoveList& moveList) noexcept {}
