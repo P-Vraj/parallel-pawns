@@ -6,10 +6,6 @@
 
 #include "types.h"
 
-inline std::string to_string(Color c) {
-    return c == Color::White ? "w" : "b";
-}
-
 inline char to_char(PieceType pt) {
     switch (pt) {
         case PieceType::Pawn:
@@ -28,6 +24,10 @@ inline char to_char(PieceType pt) {
             return '.';
     }
     return '?';
+}
+
+inline std::string to_string(Color c) {
+    return c == Color::White ? "w" : "b";
 }
 
 inline std::string to_string(Piece p) {
@@ -51,7 +51,7 @@ inline std::string to_string(CastlingRights cr) {
     if (cr == CastlingRights::None) {
         return "-";
     }
-    std::string s;
+    std::string s{};
     if ((cr & CastlingRights::WhiteKingside) != CastlingRights::None)
         s += 'K';
     if ((cr & CastlingRights::WhiteQueenside) != CastlingRights::None)

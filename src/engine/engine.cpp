@@ -1,5 +1,6 @@
 #include <iostream>
 
+#include "geometry.h"
 #include "move_gen/attacks.h"
 #include "position.h"
 #include "types.h"
@@ -11,6 +12,7 @@ using namespace attacks;
 void engine_init() {
     zobrist::init();
     attacks::init_attack_tables();
+    geom::init_geometry_tables();
 }
 
 int main() {

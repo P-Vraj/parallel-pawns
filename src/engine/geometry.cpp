@@ -1,5 +1,7 @@
 #include "geometry.h"
 
+#include "move_gen/attacks.h"
+
 namespace {
 
 inline constexpr Bitboard kFileA = 0x0101010101010101ULL;
@@ -7,21 +9,13 @@ inline constexpr Bitboard kFileH = 0x8080808080808080ULL;
 inline constexpr Bitboard kRank1 = 0x00000000000000FFULL;
 inline constexpr Bitboard kRank8 = 0xFF00000000000000ULL;
 
-// Rays are like directions, but 0-indexed (used to index Direction)
-enum class Ray : uint8_t {
-    North,
-    South,
-    East,
-    West,
-    NorthEast,
-    NorthWest,
-    SouthEast,
-    SouthWest,
-
-    Count = 8
-};
-
 };  // namespace
+
+namespace geom {
+
+inline std::array<std::array<Bitboard, 64>, 64> line_table{};
+inline std::array<std::array<Bitboard, 64>, 64> between_table{};
+inline std::array<std::array<Bitboard, 64>, 64> ray_pass_table{};
 
 constexpr inline bool can_step(Square sq, Direction dir) noexcept {
     const Bitboard bb = bitboard(sq);
@@ -47,60 +41,56 @@ constexpr inline bool can_step(Square sq, Direction dir) noexcept {
     }
 }
 
-constexpr inline bool aligned_dir(Square from, Square to, Direction& out) noexcept {
-    const int df = static_cast<int>(file(from)) - static_cast<int>(file(to));
-    const int dr = static_cast<int>(rank(from)) - static_cast<int>(rank(to));
+void init_geometry_tables() noexcept {
+    using namespace attacks;
+    for (size_t i = 0; i < 64; ++i) {
+        const Square from = static_cast<Square>(i);
+        const Bitboard fromBB = bitboard(from);
 
-    if (df == 0 && dr > 0) {
-        out = Direction::North;
-        return true;
-    }
-    if (df == 0 && dr < 0) {
-        out = Direction::South;
-        return true;
-    }
-    if (dr == 0 && df > 0) {
-        out = Direction::East;
-        return true;
-    }
-    if (dr == 0 && df < 0) {
-        out = Direction::West;
-        return true;
-    }
+        const Bitboard orthogonalFrom = rook_attacks(from, 0);
+        const Bitboard diagonalFrom = bishop_attacks(from, 0);
 
-    if (df == dr && df > 0) {
-        out = Direction::NorthEast;
-        return true;
-    }
-    if (df == dr && df < 0) {
-        out = Direction::SouthWest;
-        return true;
-    }
-    if (df == -dr && df > 0) {
-        out = Direction::SouthEast;
-        return true;
-    }
-    if (df == -dr && df < 0) {
-        out = Direction::NorthWest;
-        return true;
-    }
+        for (size_t j = 0; j < 64; ++j) {
+            const Square to = static_cast<Square>(j);
+            const Bitboard toBB = bitboard(to);
 
-    return false;
+            Bitboard line = 0, between = 0, rayPass = 0;
+            if (orthogonalFrom & toBB) {
+                const Bitboard orthogonalTo = rook_attacks(to, 0);
+
+                line = (orthogonalFrom & orthogonalTo) | fromBB | toBB;
+                between = rook_attacks(from, toBB) & rook_attacks(to, fromBB);
+                rayPass = orthogonalFrom & (rook_attacks(to, fromBB) | toBB);
+            }
+            else if (diagonalFrom & toBB) {
+                const Bitboard diagonalTo = bishop_attacks(to, 0);
+
+                line = (diagonalFrom & diagonalTo) | fromBB | toBB;
+                between = bishop_attacks(from, toBB) & bishop_attacks(to, fromBB);
+                rayPass = diagonalFrom & (bishop_attacks(to, fromBB) | toBB);
+            }
+
+            line_table[i][j] = line;
+            between_table[i][j] = between;
+            ray_pass_table[i][j] = rayPass;
+        }
+    }
 }
 
-constexpr inline Bitboard between(Square a, Square b) noexcept {
-    Direction dir;
-    if (a == b || !aligned_dir(a, b, dir))
-        return 0;
-
-    Bitboard bb = 0;
-    Square s = a;
-    while (can_step(s, dir)) {
-        s += dir;
-        if (s == b)
-            break;
-        bb |= bitboard(s);
-    }
-
-    return bb;
+inline Bitboard between(Square a, Square b) noexcept {
+    return between_table[to_underlying(a)][to_underlying(b)];
 }
+
+inline Bitboard between_or_to(Square a, Square b) noexcept {
+    return between_table[to_underlying(a)][to_underlying(b)] | bitboard(b);
+}
+
+inline Bitboard line(Square a, Square b) noexcept {
+    return line_table[to_underlying(a)][to_underlying(b)];
+}
+
+inline Bitboard ray_pass(Square a, Square b) noexcept {
+    return ray_pass_table[to_underlying(a)][to_underlying(b)];
+}
+
+};  // namespace geom

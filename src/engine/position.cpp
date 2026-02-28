@@ -1,6 +1,8 @@
-#include <vector>
-#include <ranges>
 #include "position.h"
+
+#include <ranges>
+#include <vector>
+
 #include "util.h"
 
 namespace {
@@ -30,8 +32,7 @@ Position Position::fromFEN(std::string_view fen) {
     }
 
     pos.parsePieceMap_(fields[0]);
-    pos.fillPieceBitboards_();
-    pos.recomputeOccupancy_();
+    pos.fillBitboards_();
 
     pos.kingSquare_[to_underlying(Color::Black)] = Square(get_lsb(pos.get(Color::Black, PieceType::King)));
     pos.kingSquare_[to_underlying(Color::White)] = Square(get_lsb(pos.get(Color::White, PieceType::King)));
@@ -49,30 +50,27 @@ Position Position::fromFEN(std::string_view fen) {
 }
 
 std::string Position::toFEN() const {
-    std::string fen;
+    std::string fen{};
 
     for (int r = 7; r >= 0; --r) {
-        int emptyCount = 0;
+        int empty = 0;
         for (int f = 0; f < 8; ++f) {
-            Square sq = make_square(static_cast<File>(f), static_cast<Rank>(r));
-            Piece p = pieceOn(sq);
-            if (p == Piece::None) {
-                emptyCount++;
+            const Square sq = make_square(static_cast<File>(f), static_cast<Rank>(r));
+            const Piece p = pieceOn(sq);
+            if (is_empty(p)) {
+                empty++;
+                continue;
             }
-            else {
-                if (emptyCount > 0) {
-                    fen += std::to_string(emptyCount);
-                    emptyCount = 0;
-                }
-                fen += to_string(p);
+            if (empty > 0) {
+                fen += std::to_string(empty);
+                empty = 0;
             }
+            fen += to_string(p);
         }
-        if (emptyCount > 0) {
-            fen += std::to_string(emptyCount);
-        }
-        if (r > 0) {
+        if (empty > 0)
+            fen += std::to_string(empty);
+        if (r > 0)
             fen += '/';
-        }
     }
     fen += ' ';
 
@@ -129,7 +127,7 @@ void Position::parseCastlingRights_(std::string_view castling) noexcept {
     }
 }
 
-void Position::fillPieceBitboards_() noexcept {
+void Position::fillBitboards_() noexcept {
     for (size_t sq = 0; sq < 64; ++sq) {
         Piece piece = pieceMap_[sq];
         if (piece == Piece::None)
@@ -138,16 +136,7 @@ void Position::fillPieceBitboards_() noexcept {
         Color c = color(piece);
         PieceType pt = piece_type(piece);
         set_bit(pieces_[to_underlying(c)][to_underlying(pt) - 1], static_cast<Square>(sq));
+        set_bit(colorOccupied_[to_underlying(c)], static_cast<Square>(sq));
+        set_bit(occupied_, static_cast<Square>(sq));
     }
-}
-
-void Position::recomputeOccupancy_() noexcept {
-    for (size_t c = 0; c < to_underlying(Color::Count); ++c) {
-        Bitboard occ = 0;
-        for (size_t pt = to_underlying(PieceType::Pawn); pt < to_underlying(PieceType::Count); ++pt) {
-            occ |= get(Color(c), PieceType(pt));
-        }
-        colorOccupied_[c] = occ;
-    }
-    occupied_ = occupancy<Color::White>() | occupancy<Color::Black>();
 }

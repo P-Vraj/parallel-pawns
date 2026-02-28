@@ -8,9 +8,19 @@ constexpr inline std::array<Direction, 8> kDirs = {
 };
 // clang-format on
 
+namespace geom {
+
 constexpr inline bool can_step(Square sq, Direction dir) noexcept;
 
-constexpr inline bool aligned_dir(Square from, Square to, Direction& out) noexcept;
-
+// Initializes the line, between, and ray_pass tables.
+void init_geometry_tables() noexcept;
 // Returns bitboard of squares strictly between a and b (excluding a and b), or 0 if a and b are not aligned.
-constexpr inline Bitboard between(Square a, Square b) noexcept;
+inline Bitboard between(Square a, Square b) noexcept;
+// Returns bitboard of squares between a and b (including b), or 0 if a and b are not aligned.
+inline Bitboard between_or_to(Square a, Square b) noexcept;
+// Returns bitboard of squares on the full line with a to b (including a and b), or 0 if a and b are not aligned.
+inline Bitboard line(Square a, Square b) noexcept;
+// Returns bitboard of squares on the ray from a past b, or 0 if a and b are not aligned.
+inline Bitboard ray_pass(Square a, Square b) noexcept;
+
+};  // namespace geom
