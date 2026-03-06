@@ -213,6 +213,11 @@ enum class PieceType : uint8_t {
     Count = 7
 };
 
+constexpr inline PieceType& operator++(PieceType& pt) noexcept {
+    pt = static_cast<PieceType>(to_underlying(pt) + 1);
+    return pt;
+}
+
 // clang-format off
 enum class Piece : uint8_t {
     None,
@@ -326,4 +331,14 @@ struct Move {
 
 private:
     uint16_t data_;
+};
+
+constexpr int piece_values[] = {
+    0,   // None
+    100, // Pawn
+    320, // Knight
+    330, // Bishop
+    500, // Rook
+    900, // Queen
+    20000, // King
 };

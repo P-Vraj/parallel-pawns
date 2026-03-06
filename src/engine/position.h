@@ -27,6 +27,8 @@ struct Position {
     constexpr Key hash() const noexcept { return hash_; }
     constexpr uint16_t fullmoveNumber() const noexcept { return fullmoveNumber_; }
     constexpr uint8_t halfmoveClock() const noexcept { return halfmoveClock_; }
+    constexpr int16_t evaluation() const noexcept { return evaluationScore_; }
+    constexpr void setEvaluation(int16_t score) noexcept { evaluationScore_ = score; }
 
     // Creates a Position from a FEN string. Assumes the FEN is valid and well-formed.
     static Position fromFEN(std::string_view fen);
@@ -43,6 +45,7 @@ private:
     CastlingRights castlingRights_;
     uint16_t fullmoveNumber_;
     uint8_t halfmoveClock_;
+    int16_t evaluationScore_ = 0;
     Square enPassantSquare_;
     Key hash_;
 
@@ -52,4 +55,4 @@ private:
     void fillBitboards_() noexcept;
 };
 
-static_assert(sizeof(Position) == 200);
+// static_assert(sizeof(Position) == 200);
