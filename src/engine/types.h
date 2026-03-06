@@ -264,6 +264,7 @@ constexpr Piece make_piece(Color c, PieceType pt) noexcept {
 }
 
 // clang-format off
+// Castling rights are represented as a bitfield, and there are 16 possible states
 enum class CastlingRights : uint8_t {
     None           = 0b0000,
     WhiteKingside  = 0b0001,

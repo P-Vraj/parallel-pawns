@@ -7,6 +7,7 @@ struct UndoInfo {
     Piece captured = Piece::None;
     CastlingRights castlingRights{};
     Square enPassantSquare = Square::None;
+    uint8_t halfmoveClock = 0;
     Key hash{};
 };
 static_assert(sizeof(UndoInfo) == 16);
@@ -37,11 +38,12 @@ struct Position {
     static Position fromFEN(std::string_view fen);
     // Converts the Position back to a FEN string.
     std::string toFEN() const;
-
     // Makes the given move on the position, updating the position and filling in the undo information.
     void makeMove(Move m, UndoInfo& undo) noexcept;
     // Undoes the given move using the provided undo information, restoring the position to its previous state.
     void undoMove(Move m, const UndoInfo& undo) noexcept;
+    // Computes the Zobrist hash of the position. Only needed at initialization, as the hash is updated incrementally.
+    Key computeHash() const noexcept;
 
 private:
     std::array<std::array<Bitboard, to_underlying(PieceType::Count) - 1>, to_underlying(Color::Count)> pieces_;
@@ -60,9 +62,8 @@ private:
     void parseCastlingRights_(std::string_view castling) noexcept;
     // Fills the piece bitboards and occupancy bitboards based on the pieceMap_.
     void fillBitboards_() noexcept;
-    void removePiece(Square sq) noexcept;
-    void putPiece(Square sq, Piece piece) noexcept;
-    void movePiece(Square from, Square to) noexcept;
-    void updateCastlingRights(Square from, Square to) noexcept;
+    void removePiece_(Square sq) noexcept;
+    void putPiece_(Square sq, Piece piece) noexcept;
+    void movePiece_(Square from, Square to) noexcept;
 };
 static_assert(sizeof(Position) == 200);

@@ -62,7 +62,7 @@ struct PerftCase {
 };
 
 TEST_CASE("Perft positions", "[perft]") {
-    engine_init();
+    engine::init_engine();
 
     // Test cases referenced from the Chess Programming Wiki page on perft
     // Read more here: https://www.chessprogramming.org/Perft_Results

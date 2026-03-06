@@ -3,7 +3,7 @@
 namespace zobrist {
 
 std::array<std::array<std::array<Key, 64>, to_underlying(PieceType::Count) - 1>, 2> piece;
-std::array<Key, to_underlying(CastlingRights::Count)> castling;
+std::array<Key, 16> castling;
 std::array<Key, 8> enPassantFile;
 Key side;
 
@@ -27,7 +27,7 @@ void init_zobrist(uint64_t seed) noexcept {
         }
     }
 
-    for (size_t i = 0; i < to_underlying(CastlingRights::Count); ++i) {
+    for (size_t i = 0; i < 16; ++i) {
         castling[i] = prng(seed);
     }
 
