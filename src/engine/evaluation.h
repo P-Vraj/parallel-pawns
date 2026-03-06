@@ -4,7 +4,7 @@
 #include "types.h"
 #include "util.h"
 
-inline constexpr std::array<int16_t, to_underlying(PieceType::Count)> kPieceValues = {
+inline constexpr std::array<int, to_underlying(PieceType::Count)> kPieceValues = {
     0,      // None
     100,    // Pawn
     320,    // Knight
@@ -18,10 +18,10 @@ inline Eval material_diff(const Position& pos) noexcept {
     Eval score = 0;
 
     for (PieceType pt = PieceType::Pawn; pt <= PieceType::Queen; ++pt) {
-        const int16_t value = kPieceValues[to_underlying(pt)];
+        const int value = kPieceValues[to_underlying(pt)];
 
-        score += static_cast<Eval>(value * static_cast<Eval>(bit_count(pos.get(Color::White, pt))));
-        score -= static_cast<Eval>(value * static_cast<Eval>(bit_count(pos.get(Color::Black, pt))));
+        score += value * bit_count(pos.get(Color::White, pt));
+        score -= value * bit_count(pos.get(Color::Black, pt));
     }
 
     return score;

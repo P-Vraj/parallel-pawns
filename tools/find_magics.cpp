@@ -1,6 +1,7 @@
 // This script finds magic numbers for rook and bishop move generation
 // Build and run with: `cmake --build build --target run-find-magics`
 
+#include <algorithm>
 #include <format>
 #include <random>
 #include <span>
@@ -30,7 +31,7 @@ Magic find_magic_for_square(
     while (true) {
         Magic magic{ mask, sparse_rand64(rng), static_cast<uint8_t>(64 - relevantBits) };
 
-        std::fill(used.begin(), used.end(), 0ULL);
+        std::ranges::fill(used.begin(), used.end(), 0ULL);
 
         bool collision = false;
         for (size_t i = 0; i < occs.size(); ++i) {
