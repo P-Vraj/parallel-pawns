@@ -221,36 +221,19 @@ void generate_en_passant_moves(const Position& pos, const State& state, MoveList
     if (!is_valid(epSq))
         return;
 
-    const Bitboard filter = state.pins.pinRay[to_underlying(epSq)] & state.evasionMask;
-    Bitboard pawns = pos.get(state.us, PieceType::Pawn) & attacks::pawn_attacks(state.them, epSq) & filter;
+    Bitboard pawns = pos.get(state.us, PieceType::Pawn) & attacks::pawn_attacks(state.them, epSq);
 
     while (pawns) {
         const auto from = static_cast<Square>(pop_lsb(pawns));
+        // Check if en passant capture would expose the king to check
         UndoInfo undo;
-        Position posCopy = pos;
-        Move epMove = Move(from, epSq, MoveType::EnPassant);
-        posCopy.makeMove(epMove, undo);
-        if (!is_square_attacked(posCopy, posCopy.kingSquare(state.us), state.them)) {
-            moveList.push_back(epMove);
+        Position copy = pos;
+        copy.makeMove(Move(from, epSq, MoveType::EnPassant), undo);
+        if (!is_square_attacked(copy, copy.kingSquare(state.us), state.them)) {
+            moveList.push_back(Move(from, epSq, MoveType::EnPassant));
         }
-        posCopy.undoMove(epMove, undo);
     }
 }
-
-// void generate_en_passant_moves(const Position& pos, const State& state, MoveList& moveList) noexcept {
-//     const Square epSq = pos.epSquare();
-//     if (!is_valid(epSq))
-//         return;
-
-//     // const Bitboard filter = state.pins.pinRay[to_underlying(epSq)] & state.evasionMask;
-//     Bitboard pawns = pos.get(state.us, PieceType::Pawn) & attacks::pawn_attacks(state.them, epSq);
-
-//     while (pawns) {
-//         const auto from = static_cast<Square>(pop_lsb(pawns));
-//         if (state.pins.pinRay[to_underlying(from)] & state.evasionMask)
-//             moveList.push_back(Move(from, epSq, MoveType::EnPassant));
-//     }
-// }
 
 }  // namespace
 
