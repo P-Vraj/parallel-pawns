@@ -1,11 +1,12 @@
 #include "position.h"
 
+#include <algorithm>
 #include <ranges>
 #include <vector>
 
+#include "move_gen/generator.h"
 #include "util.h"
 #include "zobrist.h"
-#include "move_gen/generator.h"
 
 namespace {
 constexpr std::array<uint8_t, 64> make_castle_mask() {
@@ -23,21 +24,10 @@ constexpr std::array<uint8_t, 64> make_castle_mask() {
     return mask;
 }
 
-bool has_legal_en_passant(const Position& pos) noexcept {
-    if (!is_valid(pos.epSquare()))
-        return false;
-    MoveList moves(pos);
-    for (const Move m : moves) {
-        if (m.moveType() == MoveType::EnPassant)
-            return true;
-    }
-    return false;
-}
-
 constexpr std::array<uint8_t, 64> kCastleMask = make_castle_mask();
 }  // namespace
 
-Position Position::fromFEN(std::string_view fen) {
+Position Position::fromFEN(std::string_view fen) noexcept {
     Position pos{};
     std::vector<std::string_view> fields;
     for (const auto field : fen | std::views::split(' ')) {
@@ -67,7 +57,7 @@ Position Position::fromFEN(std::string_view fen) {
     return pos;
 }
 
-std::string Position::toFEN() const {
+std::string Position::toFEN() const noexcept {
     std::string fen{};
 
     for (int r = 7; r >= 0; --r) {
@@ -94,7 +84,7 @@ std::string Position::toFEN() const {
 
     fen += std::format("{} ", (sideToMove() == Color::White) ? 'w' : 'b');
     fen += std::format("{} ", to_string(castlingRights()));
-    fen += std::format("{} ", (has_legal_en_passant(*this)) ? to_string(epSquare()) : "-");
+    fen += std::format("{} ", (hasLegalEnPassant_()) ? to_string(epSquare()) : "-");
     fen += std::format("{} {}", halfmoveClock(), fullmoveNumber());
 
     return fen;
@@ -159,13 +149,21 @@ void Position::fillBitboards_() noexcept {
     }
 }
 
+bool Position::hasLegalEnPassant_() const noexcept {
+    if (!is_valid(enPassantSquare_))
+        return false;
+    Position opponent = *this;
+    opponent.sideToMove_ = ~opponent.sideToMove_;
+    MoveList moves(opponent);
+    return std::ranges::any_of(moves, [](const Move m) { return m.moveType() == MoveType::EnPassant; });
+}
+
 void Position::makeMove(Move m, UndoInfo& undo) noexcept {
     undo = UndoInfo{
         .captured = Piece::None,
         .castlingRights = castlingRights_,
         .enPassantSquare = enPassantSquare_,
         .halfmoveClock = halfmoveClock_,
-        .hash = hash_,
     };
 
     const Square from = m.from();
@@ -189,7 +187,6 @@ void Position::makeMove(Move m, UndoInfo& undo) noexcept {
         case MoveType::PawnDoubleStep: {
             const Direction dir = (sideToMove_ == Color::White) ? Direction::South : Direction::North;
             enPassantSquare_ = to + dir;
-            undo.enPassantSquare = enPassantSquare_;
             movePiece_(from, to);
             hash_ ^= zobrist::enPassantFile[to_underlying(file(enPassantSquare_))];
             break;
@@ -254,19 +251,29 @@ void Position::makeMove(Move m, UndoInfo& undo) noexcept {
 
     // Update king square, move counters, and side to move
     kingSquare_[to_underlying(sideToMove_)] = static_cast<Square>(get_lsb(get(sideToMove_, PieceType::King)));
+
     fullmoveNumber_ += (sideToMove_ == Color::Black) ? 1 : 0;
     halfmoveClock_ = (m.isCapture() || piece_type(pieceOn(to)) == PieceType::Pawn) ? 0 : halfmoveClock_ + 1;
+
     sideToMove_ = ~sideToMove_;
     hash_ ^= zobrist::side;
 }
 
 void Position::undoMove(Move m, const UndoInfo& undo) noexcept {
+    hash_ ^= zobrist::castling[to_underlying(castlingRights_)];
     castlingRights_ = undo.castlingRights;
-    enPassantSquare_ = undo.enPassantSquare;
-    hash_ = undo.hash;
-    halfmoveClock_ = undo.halfmoveClock;
+    hash_ ^= zobrist::castling[to_underlying(castlingRights_)];
 
+    if (is_valid(enPassantSquare_))
+        hash_ ^= zobrist::enPassantFile[to_underlying(file(enPassantSquare_))];
+    enPassantSquare_ = undo.enPassantSquare;
+    if (is_valid(enPassantSquare_))
+        hash_ ^= zobrist::enPassantFile[to_underlying(file(enPassantSquare_))];
+
+    hash_ ^= zobrist::side;
     sideToMove_ = ~sideToMove_;
+
+    halfmoveClock_ = undo.halfmoveClock;
     fullmoveNumber_ -= (sideToMove_ == Color::Black) ? 1 : 0;
 
     const Square from = m.from();
@@ -363,7 +370,8 @@ void Position::movePiece_(Square from, Square to) noexcept {
 
 Key Position::computeHash() const noexcept {
     Key h = 0;
-    for (Square sq = Square::A1; sq <= Square::H8; ++sq) {
+    for (size_t s = 0; s < 64; ++s) {
+        const auto sq = static_cast<Square>(s);
         const Piece piece = pieceOn(sq);
         if (!is_empty(piece))
             h ^= zobrist::piece[to_underlying(color(piece))][to_underlying(piece_type(piece)) - 1][to_underlying(sq)];

@@ -15,7 +15,7 @@ uint64_t perft(Position& pos, int depth) {  // NOLINT(misc-no-recursion)
     if (depth <= 0)
         return 1;
 
-    MoveList moves(pos);
+    const MoveList moves(pos);
 
     if (depth == 1)
         return static_cast<uint64_t>(moves.size());
@@ -27,6 +27,7 @@ uint64_t perft(Position& pos, int depth) {  // NOLINT(misc-no-recursion)
         nodes += perft(pos, depth - 1);
         pos.undoMove(m, u);
     }
+
     return nodes;
 }
 
@@ -34,7 +35,7 @@ uint64_t divide(Position& pos, int depth) {  // NOLINT(misc-no-recursion)
     if (depth <= 0)
         return 1;
 
-    MoveList moves(pos);
+    const MoveList moves(pos);
 
     uint64_t nodes = 0;
     for (const Move m : moves) {
@@ -47,7 +48,31 @@ uint64_t divide(Position& pos, int depth) {  // NOLINT(misc-no-recursion)
         nodes += n;
     }
     std::cout << "\nNodes searched: " << nodes << "\n";
+
     return nodes;
+}
+
+void perft_invariants(Position& pos, int depth) {  // NOLINT(misc-no-recursion)
+    if (depth <= 0)
+        return;
+
+    const MoveList moves(pos);
+
+    for (const Move m : moves) {
+        const std::string previousFEN = pos.toFEN();
+        const Key previousHash = pos.hash();
+
+        UndoInfo u{};
+        pos.makeMove(m, u);
+
+        REQUIRE(pos.hash() == pos.computeHash());
+
+        perft_invariants(pos, depth - 1);
+        pos.undoMove(m, u);
+
+        REQUIRE(pos.hash() == previousHash);
+        REQUIRE(pos.toFEN() == previousFEN);
+    }
 }
 
 }  // namespace
@@ -58,7 +83,7 @@ struct PerftCase {
     std::vector<std::pair<int, uint64_t>> checks;  // (depth, expected nodes)
 };
 
-TEST_CASE("Perft positions", "[perft]") {
+TEST_CASE("Perft", "[perft]") {
     engine::init_engine();
 
     // Test cases referenced from the Chess Programming Wiki page on perft
@@ -147,5 +172,57 @@ TEST_CASE("Perft positions", "[perft]") {
                 divide(pos, depth);
             }
         }
+    }
+}
+
+struct InvariantCase {
+    const char* name;
+    const char* fen;
+    int depth;
+};
+
+// Tests that the position invariants hold at each node of the search tree up to the given depth.
+// Tests that the rolling hashes and FEN representations are always consistent.
+TEST_CASE("Invariants", "[invariants]") {
+    engine::init_engine();
+
+    // clang-format off
+    const std::vector<InvariantCase> cases = {
+        {
+            "Position 1 (Startpos)",
+            "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1",
+            4,
+        },
+        {
+            "Position 2 (Kiwipete)",
+            "r3k2r/p1ppqpb1/bn2pnp1/3PN3/1p2P3/2N2Q1p/PPPBBPPP/R3K2R w KQkq - 0 1",
+            4,
+        },
+        {
+            "Position 3",
+            "8/2p5/3p4/KP5r/1R3p1k/8/4P1P1/8 w - - 0 1",
+            4,
+        },
+        {
+            "Position 4",
+            "r3k2r/Pppp1ppp/1b3nbN/nP6/BBP1P3/q4N2/Pp1P2PP/R2Q1RK1 w kq - 0 1",
+            4,
+        },
+        {
+            "Position 5",
+            "rnbq1k1r/pp1Pbppp/2p5/8/2B5/8/PPP1NnPP/RNBQK2R w KQ - 1 8",
+            4,
+        },
+        {
+            "Position 6",
+            "r4rk1/1pp1qppp/p1np1n2/2b1p1B1/2B1P1b1/P1NP1N2/1PP1QPPP/R4RK1 w - - 0 10",
+            4,
+        },
+    };
+    // clang-format on
+
+    for (const auto& tc : cases) {
+        Position pos = Position::fromFEN(tc.fen);
+        perft_invariants(pos, tc.depth);
     }
 }
