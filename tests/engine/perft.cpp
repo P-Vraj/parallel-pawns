@@ -15,9 +15,7 @@ uint64_t perft(Position& pos, int depth) {  // NOLINT(misc-no-recursion)
     if (depth <= 0)
         return 1;
 
-    MoveList moves{};
-    moves.clear();
-    generate_moves(pos, moves);
+    MoveList moves(pos);
 
     if (depth == 1)
         return static_cast<uint64_t>(moves.size());
@@ -36,8 +34,7 @@ uint64_t divide(Position& pos, int depth) {  // NOLINT(misc-no-recursion)
     if (depth <= 0)
         return 1;
 
-    MoveList moves{};
-    generate_moves(pos, moves);
+    MoveList moves(pos);
 
     uint64_t nodes = 0;
     for (const Move m : moves) {

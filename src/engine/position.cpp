@@ -5,6 +5,7 @@
 
 #include "util.h"
 #include "zobrist.h"
+#include "move_gen/generator.h"
 
 namespace {
 constexpr std::array<uint8_t, 64> make_castle_mask() {
@@ -20,6 +21,17 @@ constexpr std::array<uint8_t, 64> make_castle_mask() {
     mask[to_underlying(Square::A8)] &= 0b0111;
 
     return mask;
+}
+
+bool has_legal_en_passant(const Position& pos) noexcept {
+    if (!is_valid(pos.epSquare()))
+        return false;
+    MoveList moves(pos);
+    for (const Move m : moves) {
+        if (m.moveType() == MoveType::EnPassant)
+            return true;
+    }
+    return false;
 }
 
 constexpr std::array<uint8_t, 64> kCastleMask = make_castle_mask();
@@ -82,7 +94,7 @@ std::string Position::toFEN() const {
 
     fen += std::format("{} ", (sideToMove() == Color::White) ? 'w' : 'b');
     fen += std::format("{} ", to_string(castlingRights()));
-    fen += std::format("{} ", (epSquare() == Square::None) ? "-" : to_string(epSquare()));
+    fen += std::format("{} ", (has_legal_en_passant(*this)) ? to_string(epSquare()) : "-");
     fen += std::format("{} {}", halfmoveClock(), fullmoveNumber());
 
     return fen;

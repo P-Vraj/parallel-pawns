@@ -55,7 +55,7 @@ private:
     CastlingRights castlingRights_;
     uint16_t fullmoveNumber_;
     uint8_t halfmoveClock_;
-    Square enPassantSquare_;
+    Square enPassantSquare_; // Candidate en passant square
     Key hash_;
 
     void parsePieceMap_(std::string_view placement) noexcept;

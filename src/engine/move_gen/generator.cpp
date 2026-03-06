@@ -98,7 +98,7 @@ void generate_piece_moves(const Position& pos, const State& state, MoveList& mov
     }
 }
 
-void push_pawn_targets(
+void push_pawn_attacks(
     Square from,
     Bitboard targets,
     Bitboard themOcc,
@@ -131,7 +131,7 @@ void generate_pawn_moves(const Position& pos, const State& state, MoveList& move
             const auto from = static_cast<Square>(pop_lsb(p));
             Bitboard targets = attacks::pawn_attacks(state.us, from) & state.themOcc;
             targets &= state.pins.pinRay[to_underlying(from)] & state.evasionMask;
-            push_pawn_targets(from, targets, state.themOcc, state.us, MoveType::Normal, moveList);
+            push_pawn_attacks(from, targets, state.themOcc, state.us, MoveType::Normal, moveList);
         }
     }
     // Pushes
@@ -147,7 +147,7 @@ void generate_pawn_moves(const Position& pos, const State& state, MoveList& move
                 continue;
 
             const Bitboard singleTargets = bitboard(singlePushTo) & filter;
-            push_pawn_targets(from, singleTargets, state.themOcc, state.us, MoveType::Normal, moveList);
+            push_pawn_attacks(from, singleTargets, state.themOcc, state.us, MoveType::Normal, moveList);
 
             // Double push (if on starting rank and single push was also valid)
             const Rank startRank = (state.us == Color::White) ? Rank::R2 : Rank::R7;
@@ -158,7 +158,7 @@ void generate_pawn_moves(const Position& pos, const State& state, MoveList& move
             if (!is_valid(doublePushTo) || (state.occ & bitboard(doublePushTo)) != 0)
                 continue;
             const Bitboard doubleTargets = bitboard(doublePushTo) & filter;
-            push_pawn_targets(from, doubleTargets, state.themOcc, state.us, MoveType::PawnDoubleStep, moveList);
+            push_pawn_attacks(from, doubleTargets, state.themOcc, state.us, MoveType::PawnDoubleStep, moveList);
         }
     }
 }
@@ -221,15 +221,19 @@ void generate_en_passant_moves(const Position& pos, const State& state, MoveList
     if (!is_valid(epSq))
         return;
 
-    Bitboard pawns = pos.get(state.us, PieceType::Pawn) & attacks::pawn_attacks(state.them, epSq);
+    const Square kingSq = state.kingSq;
+    const Color them = state.them;
+    Bitboard pawns = pos.get(state.us, PieceType::Pawn) & attacks::pawn_attacks(them, epSq);
 
     while (pawns) {
         const auto from = static_cast<Square>(pop_lsb(pawns));
-        // Check if en passant capture would expose the king to check
-        UndoInfo undo;
-        Position copy = pos;
-        copy.makeMove(Move(from, epSq, MoveType::EnPassant), undo);
-        if (!is_square_attacked(copy, copy.kingSquare(state.us), state.them)) {
+        // Only push the move if the en passant capture wouldn't expose the king to check
+        const Direction dir = (state.us == Color::White) ? Direction::South : Direction::North;
+        const Square capturedPawnSq = geom::step(epSq, dir);
+        const Bitboard afterEpOcc = (state.occ ^ bitboard(from) ^ bitboard(capturedPawnSq)) | bitboard(epSq);
+        if (!(attacks::bishop_attacks(kingSq, afterEpOcc) & pos.get(them, PieceType::Bishop)) &&
+            !(attacks::rook_attacks(kingSq, afterEpOcc) & pos.get(them, PieceType::Rook)) &&
+            !(attacks::queen_attacks(kingSq, afterEpOcc) & pos.get(them, PieceType::Queen))) [[likely]] {
             moveList.push_back(Move(from, epSq, MoveType::EnPassant));
         }
     }
