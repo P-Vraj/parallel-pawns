@@ -1,5 +1,6 @@
 #pragma once
 #include <array>
+#include <cassert>
 #include <cstdint>
 #include <utility>
 
@@ -7,7 +8,7 @@ using std::to_underlying, std::size_t;
 
 using Bitboard = uint64_t;
 using Key = uint64_t;
-using Eval = int16_t;
+using Eval = int32_t;
 
 // clang-format off
 enum class Square : uint8_t {
@@ -86,6 +87,7 @@ enum class File : uint8_t {
 };
 
 constexpr File file(Square sq) noexcept {
+    assert(is_valid(sq));
     return File(to_underlying(sq) % 8);
 }
 
@@ -140,6 +142,7 @@ enum class Rank : uint8_t {
 
 // Returns the 0-indexed rank of a square
 constexpr Rank rank(Square sq) noexcept {
+    assert(is_valid(sq));
     return Rank(to_underlying(sq) / 8);
 }
 
@@ -188,14 +191,17 @@ constexpr bool is_valid(File f, Rank r) noexcept {
 }
 
 constexpr inline Bitboard bitboard(Square sq) noexcept {
+    assert(is_valid(sq));
     return static_cast<Bitboard>(1ULL << to_underlying(sq));
 }
 
 constexpr inline Bitboard bitboard(Rank r) noexcept {
+    assert(is_valid(r));
     return static_cast<Bitboard>(0xFFULL << (to_underlying(r) * 8));
 }
 
 constexpr inline Bitboard bitboard(File f) noexcept {
+    assert(is_valid(f));
     return static_cast<Bitboard>(0x0101010101010101ULL << to_underlying(f));
 }
 
@@ -246,11 +252,13 @@ constexpr Color color(Piece p) noexcept {
 }
 
 constexpr PieceType piece_type(Piece p) noexcept {
+    if (is_empty(p)) [[unlikely]]
+        return PieceType::None;
     return PieceType(to_underlying(p) % 8);
 }
 
 constexpr Piece make_piece(Color c, PieceType pt) noexcept {
-    if (pt == PieceType::None)
+    if (pt == PieceType::None) [[unlikely]]
         return Piece::None;
     return Piece(to_underlying(pt) + (to_underlying(c) * 8));
 }
