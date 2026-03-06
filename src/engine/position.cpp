@@ -1,9 +1,12 @@
 #include "position.h"
 
+#include <algorithm>
 #include <ranges>
 #include <vector>
 
+#include "move_gen/generator.h"
 #include "util.h"
+#include "zobrist.h"
 
 namespace {
 constexpr std::array<uint8_t, 64> make_castle_mask() {
@@ -24,7 +27,7 @@ constexpr std::array<uint8_t, 64> make_castle_mask() {
 constexpr std::array<uint8_t, 64> kCastleMask = make_castle_mask();
 }  // namespace
 
-Position Position::fromFEN(std::string_view fen) {
+Position Position::fromFEN(std::string_view fen) noexcept {
     Position pos{};
     std::vector<std::string_view> fields;
     for (const auto field : fen | std::views::split(' ')) {
@@ -49,10 +52,12 @@ Position Position::fromFEN(std::string_view fen) {
     if (fields.size() > 5)
         pos.fullmoveNumber_ = std::stoi(std::string(fields[5]));
 
+    pos.hash_ = pos.computeHash();
+
     return pos;
 }
 
-std::string Position::toFEN() const {
+std::string Position::toFEN() const noexcept {
     std::string fen{};
 
     for (int r = 7; r >= 0; --r) {
@@ -79,7 +84,7 @@ std::string Position::toFEN() const {
 
     fen += std::format("{} ", (sideToMove() == Color::White) ? 'w' : 'b');
     fen += std::format("{} ", to_string(castlingRights()));
-    fen += std::format("{} ", (epSquare() == Square::None) ? "-" : to_string(epSquare()));
+    fen += std::format("{} ", (hasLegalEnPassant_()) ? to_string(epSquare()) : "-");
     fen += std::format("{} {}", halfmoveClock(), fullmoveNumber());
 
     return fen;
@@ -144,43 +149,54 @@ void Position::fillBitboards_() noexcept {
     }
 }
 
+bool Position::hasLegalEnPassant_() const noexcept {
+    if (!is_valid(enPassantSquare_))
+        return false;
+    Position opponent = *this;
+    opponent.sideToMove_ = ~opponent.sideToMove_;
+    MoveList moves(opponent);
+    return std::ranges::any_of(moves, [](const Move m) { return m.moveType() == MoveType::EnPassant; });
+}
+
 void Position::makeMove(Move m, UndoInfo& undo) noexcept {
     undo = UndoInfo{
         .captured = Piece::None,
         .castlingRights = castlingRights_,
         .enPassantSquare = enPassantSquare_,
-        .hash = hash_,
+        .halfmoveClock = halfmoveClock_,
     };
 
     const Square from = m.from();
     const Square to = m.to();
 
+    if (is_valid(enPassantSquare_))
+        hash_ ^= zobrist::enPassantFile[to_underlying(file(enPassantSquare_))];
     enPassantSquare_ = Square::None;
 
     switch (m.moveType()) {
         case MoveType::Normal: {
-            movePiece(from, to);
+            movePiece_(from, to);
             break;
         }
         case MoveType::Capture: {
             undo.captured = pieceOn(to);
-            removePiece(to);
-            movePiece(from, to);
+            removePiece_(to);
+            movePiece_(from, to);
             break;
         }
         case MoveType::PawnDoubleStep: {
             const Direction dir = (sideToMove_ == Color::White) ? Direction::South : Direction::North;
             enPassantSquare_ = to + dir;
-            undo.enPassantSquare = enPassantSquare_;
-            movePiece(from, to);
+            movePiece_(from, to);
+            hash_ ^= zobrist::enPassantFile[to_underlying(file(enPassantSquare_))];
             break;
         }
         case MoveType::EnPassant: {
             const Direction dir = (sideToMove_ == Color::White) ? Direction::South : Direction::North;
             const Square capturedPawnSquare = to + dir;
             undo.captured = pieceOn(capturedPawnSquare);
-            removePiece(capturedPawnSquare);
-            movePiece(from, to);
+            removePiece_(capturedPawnSquare);
+            movePiece_(from, to);
             break;
         }
         case MoveType::CastleKing: {
@@ -190,8 +206,8 @@ void Position::makeMove(Move m, UndoInfo& undo) noexcept {
             const Square rookFrom = white ? Square::H1 : Square::H8;
             const Square rookTo = white ? Square::F1 : Square::F8;
 
-            movePiece(kingFrom, kingTo);
-            movePiece(rookFrom, rookTo);
+            movePiece_(kingFrom, kingTo);
+            movePiece_(rookFrom, rookTo);
             break;
         }
         case MoveType::CastleQueen: {
@@ -201,16 +217,16 @@ void Position::makeMove(Move m, UndoInfo& undo) noexcept {
             const Square rookFrom = white ? Square::A1 : Square::A8;
             const Square rookTo = white ? Square::D1 : Square::D8;
 
-            movePiece(kingFrom, kingTo);
-            movePiece(rookFrom, rookTo);
+            movePiece_(kingFrom, kingTo);
+            movePiece_(rookFrom, rookTo);
             break;
         }
         case MoveType::PromotionKnight:
         case MoveType::PromotionBishop:
         case MoveType::PromotionRook:
         case MoveType::PromotionQueen: {
-            removePiece(from);
-            putPiece(to, make_piece(sideToMove_, m.promotionType()));
+            removePiece_(from);
+            putPiece_(to, make_piece(sideToMove_, m.promotionType()));
             break;
         }
         case MoveType::PromotionCaptureKnight:
@@ -218,49 +234,70 @@ void Position::makeMove(Move m, UndoInfo& undo) noexcept {
         case MoveType::PromotionCaptureRook:
         case MoveType::PromotionCaptureQueen: {
             undo.captured = pieceOn(to);
-            removePiece(to);
-            removePiece(from);
-            putPiece(to, make_piece(sideToMove_, m.promotionType()));
+            removePiece_(to);
+            removePiece_(from);
+            putPiece_(to, make_piece(sideToMove_, m.promotionType()));
             break;
         }
         default:
             break;
     }
 
-    updateCastlingRights(from, to);
+    // Update castling rights
+    hash_ ^= zobrist::castling[to_underlying(castlingRights_)];
+    const uint8_t mask = kCastleMask[to_underlying(from)] & kCastleMask[to_underlying(to)];
+    castlingRights_ &= static_cast<CastlingRights>(mask);
+    hash_ ^= zobrist::castling[to_underlying(castlingRights_)];
+
+    // Update king square, move counters, and side to move
     kingSquare_[to_underlying(sideToMove_)] = static_cast<Square>(get_lsb(get(sideToMove_, PieceType::King)));
+
+    fullmoveNumber_ += (sideToMove_ == Color::Black) ? 1 : 0;
+    halfmoveClock_ = (m.isCapture() || piece_type(pieceOn(to)) == PieceType::Pawn) ? 0 : halfmoveClock_ + 1;
+
     sideToMove_ = ~sideToMove_;
+    hash_ ^= zobrist::side;
 }
 
 void Position::undoMove(Move m, const UndoInfo& undo) noexcept {
+    hash_ ^= zobrist::castling[to_underlying(castlingRights_)];
     castlingRights_ = undo.castlingRights;
-    enPassantSquare_ = undo.enPassantSquare;
-    hash_ = undo.hash;
+    hash_ ^= zobrist::castling[to_underlying(castlingRights_)];
 
+    if (is_valid(enPassantSquare_))
+        hash_ ^= zobrist::enPassantFile[to_underlying(file(enPassantSquare_))];
+    enPassantSquare_ = undo.enPassantSquare;
+    if (is_valid(enPassantSquare_))
+        hash_ ^= zobrist::enPassantFile[to_underlying(file(enPassantSquare_))];
+
+    hash_ ^= zobrist::side;
     sideToMove_ = ~sideToMove_;
+
+    halfmoveClock_ = undo.halfmoveClock;
+    fullmoveNumber_ -= (sideToMove_ == Color::Black) ? 1 : 0;
 
     const Square from = m.from();
     const Square to = m.to();
 
     switch (m.moveType()) {
         case MoveType::Normal: {
-            movePiece(to, from);
+            movePiece_(to, from);
             break;
         }
         case MoveType::Capture: {
-            movePiece(to, from);
-            putPiece(to, undo.captured);
+            movePiece_(to, from);
+            putPiece_(to, undo.captured);
             break;
         }
         case MoveType::PawnDoubleStep: {
-            movePiece(to, from);
+            movePiece_(to, from);
             break;
         }
         case MoveType::EnPassant: {
             const Direction dir = (sideToMove_ == Color::White) ? Direction::South : Direction::North;
             const Square capturedPawnSquare = to + dir;
-            movePiece(to, from);
-            putPiece(capturedPawnSquare, undo.captured);
+            movePiece_(to, from);
+            putPiece_(capturedPawnSquare, undo.captured);
             break;
         }
         case MoveType::CastleKing: {
@@ -270,8 +307,8 @@ void Position::undoMove(Move m, const UndoInfo& undo) noexcept {
             const Square rookFrom = white ? Square::H1 : Square::H8;
             const Square rookTo = white ? Square::F1 : Square::F8;
 
-            movePiece(kingTo, kingFrom);
-            movePiece(rookTo, rookFrom);
+            movePiece_(kingTo, kingFrom);
+            movePiece_(rookTo, rookFrom);
             break;
         }
         case MoveType::CastleQueen: {
@@ -281,25 +318,25 @@ void Position::undoMove(Move m, const UndoInfo& undo) noexcept {
             const Square rookFrom = white ? Square::A1 : Square::A8;
             const Square rookTo = white ? Square::D1 : Square::D8;
 
-            movePiece(kingTo, kingFrom);
-            movePiece(rookTo, rookFrom);
+            movePiece_(kingTo, kingFrom);
+            movePiece_(rookTo, rookFrom);
             break;
         }
         case MoveType::PromotionKnight:
         case MoveType::PromotionBishop:
         case MoveType::PromotionRook:
         case MoveType::PromotionQueen: {
-            removePiece(to);
-            putPiece(from, make_piece(sideToMove_, PieceType::Pawn));
+            removePiece_(to);
+            putPiece_(from, make_piece(sideToMove_, PieceType::Pawn));
             break;
         }
         case MoveType::PromotionCaptureKnight:
         case MoveType::PromotionCaptureBishop:
         case MoveType::PromotionCaptureRook:
         case MoveType::PromotionCaptureQueen: {
-            removePiece(to);
-            putPiece(from, make_piece(sideToMove_, PieceType::Pawn));
-            putPiece(to, undo.captured);
+            removePiece_(to);
+            putPiece_(from, make_piece(sideToMove_, PieceType::Pawn));
+            putPiece_(to, undo.captured);
             break;
         }
         default:
@@ -308,28 +345,41 @@ void Position::undoMove(Move m, const UndoInfo& undo) noexcept {
     kingSquare_[to_underlying(sideToMove_)] = static_cast<Square>(get_lsb(get(sideToMove_, PieceType::King)));
 }
 
-void Position::removePiece(Square sq) noexcept {
+void Position::removePiece_(Square sq) noexcept {
     const Piece piece = pieceOn(sq);
     pieceMap_[to_underlying(sq)] = Piece::None;
     clear_bit(pieces_[to_underlying(color(piece))][to_underlying(piece_type(piece)) - 1], sq);
     clear_bit(colorOccupied_[to_underlying(color(piece))], sq);
     clear_bit(occupied_, sq);
+    hash_ ^= zobrist::piece[to_underlying(color(piece))][to_underlying(piece_type(piece)) - 1][to_underlying(sq)];
 }
 
-void Position::putPiece(Square sq, Piece piece) noexcept {
+void Position::putPiece_(Square sq, Piece piece) noexcept {
     pieceMap_[to_underlying(sq)] = piece;
     set_bit(pieces_[to_underlying(color(piece))][to_underlying(piece_type(piece)) - 1], sq);
     set_bit(colorOccupied_[to_underlying(color(piece))], sq);
     set_bit(occupied_, sq);
+    hash_ ^= zobrist::piece[to_underlying(color(piece))][to_underlying(piece_type(piece)) - 1][to_underlying(sq)];
 }
 
-void Position::movePiece(Square from, Square to) noexcept {
+void Position::movePiece_(Square from, Square to) noexcept {
     const Piece piece = pieceOn(from);
-    removePiece(from);
-    putPiece(to, piece);
+    removePiece_(from);
+    putPiece_(to, piece);
 }
 
-void Position::updateCastlingRights(Square from, Square to) noexcept {
-    const uint8_t mask = kCastleMask[to_underlying(from)] & kCastleMask[to_underlying(to)];
-    castlingRights_ &= static_cast<CastlingRights>(mask);
+Key Position::computeHash() const noexcept {
+    Key h = 0;
+    for (size_t s = 0; s < 64; ++s) {
+        const auto sq = static_cast<Square>(s);
+        const Piece piece = pieceOn(sq);
+        if (!is_empty(piece))
+            h ^= zobrist::piece[to_underlying(color(piece))][to_underlying(piece_type(piece)) - 1][to_underlying(sq)];
+    }
+    h ^= zobrist::castling[to_underlying(castlingRights())];
+    if (is_valid(enPassantSquare_))
+        h ^= zobrist::enPassantFile[to_underlying(file(enPassantSquare_))];
+    if (sideToMove_ == Color::Black)
+        h ^= zobrist::side;
+    return h;
 }

@@ -3,7 +3,7 @@
 #include <iostream>
 
 int main() {
-    engine_init();
+    engine::init_engine();
 
     const Bitboard blockers = bitboard(Square::B2) | bitboard(Square::F1);
     std::cout << "Blockers:\n" << to_string(blockers) << '\n';

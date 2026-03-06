@@ -8,8 +8,12 @@
 #include "util.h"
 #include "zobrist.h"
 
-inline void engine_init() {
+namespace engine {
+
+inline void init_engine() {
     zobrist::init_zobrist();
     attacks::init_attack_tables();
     geom::init_geometry_tables();
 }
+
+}  // namespace engine

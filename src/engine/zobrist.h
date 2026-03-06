@@ -4,7 +4,7 @@
 namespace zobrist {
 
 extern std::array<std::array<std::array<Key, 64>, to_underlying(PieceType::Count) - 1>, 2> piece;
-extern std::array<Key, to_underlying(CastlingRights::Count)> castling;
+extern std::array<Key, 16> castling;
 extern std::array<Key, 8> enPassantFile;
 extern Key side;
 
