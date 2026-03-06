@@ -92,8 +92,7 @@ void generate_piece_moves(const Position& pos, const State& state, MoveList& mov
         const auto from = static_cast<Square>(pop_lsb(pieces));
         Bitboard targets = attacks::piece_attacks<PT>(from, state.occ) & ~state.usOcc;
 
-        targets &= state.pins.pinRay[to_underlying(from)];
-        targets &= state.evasionMask;
+        targets &= state.pins.pinRay[to_underlying(from)] & state.evasionMask;
 
         push_simple_moves(from, targets, state.themOcc, moveList);
     }
@@ -150,15 +149,16 @@ void generate_pawn_moves(const Position& pos, const State& state, MoveList& move
             const Bitboard singleTargets = bitboard(singlePushTo) & filter;
             push_pawn_targets(from, singleTargets, state.themOcc, state.us, MoveType::Normal, moveList);
 
-            // Double push (only if single push was also valid)
+            // Double push (if on starting rank and single push was also valid)
             const Rank startRank = (state.us == Color::White) ? Rank::R2 : Rank::R7;
-            if (rank(from) == startRank) {
-                const Square doublePushTo = geom::step(singlePushTo, dir);
-                if (!is_valid(doublePushTo) || (state.occ & bitboard(doublePushTo)) != 0)
-                    continue;
-                const Bitboard doubleTargets = bitboard(doublePushTo) & filter;
-                push_pawn_targets(from, doubleTargets, state.themOcc, state.us, MoveType::PawnDoubleStep, moveList);
-            }
+            if (rank(from) != startRank)
+                continue;
+
+            const Square doublePushTo = geom::step(singlePushTo, dir);
+            if (!is_valid(doublePushTo) || (state.occ & bitboard(doublePushTo)) != 0)
+                continue;
+            const Bitboard doubleTargets = bitboard(doublePushTo) & filter;
+            push_pawn_targets(from, doubleTargets, state.themOcc, state.us, MoveType::PawnDoubleStep, moveList);
         }
     }
 }
@@ -220,49 +220,61 @@ void generate_en_passant_moves(const Position& pos, const State& state, MoveList
     const Square epSq = pos.epSquare();
     if (!is_valid(epSq))
         return;
-    
-    const Color us = state.us;
-    const Bitboard pinAndEvasionMask = state.pins.pinRay[to_underlying(epSq)] & state.evasionMask;
-    Bitboard pawns = pos.get(us, PieceType::Pawn) & attacks::pawn_attacks(state.them, epSq) & pinAndEvasionMask;
+
+    const Bitboard filter = state.pins.pinRay[to_underlying(epSq)] & state.evasionMask;
+    Bitboard pawns = pos.get(state.us, PieceType::Pawn) & attacks::pawn_attacks(state.them, epSq) & filter;
 
     while (pawns) {
-        const Square from = static_cast<Square>(pop_lsb(pawns));
-        moveList.push_back(Move(from, epSq, MoveType::EnPassant));
+        const auto from = static_cast<Square>(pop_lsb(pawns));
+        UndoInfo undo;
+        Position posCopy = pos;
+        Move epMove = Move(from, epSq, MoveType::EnPassant);
+        posCopy.makeMove(epMove, undo);
+        if (!is_square_attacked(posCopy, posCopy.kingSquare(state.us), state.them)) {
+            moveList.push_back(epMove);
+        }
+        posCopy.undoMove(epMove, undo);
     }
 }
+
+// void generate_en_passant_moves(const Position& pos, const State& state, MoveList& moveList) noexcept {
+//     const Square epSq = pos.epSquare();
+//     if (!is_valid(epSq))
+//         return;
+
+//     // const Bitboard filter = state.pins.pinRay[to_underlying(epSq)] & state.evasionMask;
+//     Bitboard pawns = pos.get(state.us, PieceType::Pawn) & attacks::pawn_attacks(state.them, epSq);
+
+//     while (pawns) {
+//         const auto from = static_cast<Square>(pop_lsb(pawns));
+//         if (state.pins.pinRay[to_underlying(from)] & state.evasionMask)
+//             moveList.push_back(Move(from, epSq, MoveType::EnPassant));
+//     }
+// }
 
 }  // namespace
 
 Bitboard checkers(const Position& pos, Color us) noexcept {
-    const Color opp = ~us;
+    const Color them = ~us;
     const Square kingSq = pos.kingSquare(us);
     const Bitboard occupied = pos.occupancy();
 
     Bitboard checkers = 0;
-    checkers |= attacks::pawn_attacks(us, kingSq) & pos.get(opp, PieceType::Pawn);
-    checkers |= attacks::knight_attacks(kingSq) & pos.get(opp, PieceType::Knight);
-    checkers |= attacks::bishop_attacks(kingSq, occupied) & pos.get(opp, PieceType::Bishop);
-    checkers |= attacks::rook_attacks(kingSq, occupied) & pos.get(opp, PieceType::Rook);
-    checkers |= attacks::queen_attacks(kingSq, occupied) & pos.get(opp, PieceType::Queen);
+    checkers |= attacks::pawn_attacks(us, kingSq) & pos.get(them, PieceType::Pawn);
+    checkers |= attacks::knight_attacks(kingSq) & pos.get(them, PieceType::Knight);
+    checkers |= attacks::bishop_attacks(kingSq, occupied) & pos.get(them, PieceType::Bishop);
+    checkers |= attacks::rook_attacks(kingSq, occupied) & pos.get(them, PieceType::Rook);
+    checkers |= attacks::queen_attacks(kingSq, occupied) & pos.get(them, PieceType::Queen);
     return checkers;
 }
 
 bool is_square_attacked(const Position& pos, Square sq, Color by, Bitboard occupied) noexcept {
-    const Color opp = ~by;
-
-    if (attacks::pawn_attacks(opp, sq) & pos.get(by, PieceType::Pawn))
-        return true;
-    if (attacks::knight_attacks(sq) & pos.get(by, PieceType::Knight))
-        return true;
-    if (attacks::bishop_attacks(sq, occupied) & pos.get(by, PieceType::Bishop))
-        return true;
-    if (attacks::rook_attacks(sq, occupied) & pos.get(by, PieceType::Rook))
-        return true;
-    if (attacks::queen_attacks(sq, occupied) & pos.get(by, PieceType::Queen))
-        return true;
-    if (attacks::king_attacks(sq) & pos.get(by, PieceType::King))
-        return true;
-    return false;
+    return (attacks::pawn_attacks(~by, sq) & pos.get(by, PieceType::Pawn)) ||
+           (attacks::knight_attacks(sq) & pos.get(by, PieceType::Knight)) ||
+           (attacks::bishop_attacks(sq, occupied) & pos.get(by, PieceType::Bishop)) ||
+           (attacks::rook_attacks(sq, occupied) & pos.get(by, PieceType::Rook)) ||
+           (attacks::queen_attacks(sq, occupied) & pos.get(by, PieceType::Queen)) ||
+           (attacks::king_attacks(sq) & pos.get(by, PieceType::King));
 }
 
 bool is_square_attacked(const Position& pos, Square sq, Color by) noexcept {

@@ -27,15 +27,16 @@ constexpr std::array<uint8_t, 64> kCastleMask = make_castle_mask();
 Position Position::fromFEN(std::string_view fen) {
     Position pos{};
     std::vector<std::string_view> fields;
-    for (auto field : fen | std::views::split(' ')) {
+    for (const auto field : fen | std::views::split(' ')) {
         fields.emplace_back(&*field.begin(), std::ranges::distance(field));
     }
 
     pos.parsePieceMap_(fields[0]);
     pos.fillBitboards_();
 
-    pos.kingSquare_[to_underlying(Color::Black)] = Square(get_lsb(pos.get(Color::Black, PieceType::King)));
-    pos.kingSquare_[to_underlying(Color::White)] = Square(get_lsb(pos.get(Color::White, PieceType::King)));
+    for (const Color c : { Color::White, Color::Black }) {
+        pos.kingSquare_[to_underlying(c)] = static_cast<Square>(get_lsb(pos.get(c, PieceType::King)));
+    }
 
     pos.sideToMove_ = (fields[1] == "w") ? Color::White : Color::Black;
 
@@ -43,8 +44,10 @@ Position Position::fromFEN(std::string_view fen) {
 
     pos.enPassantSquare_ = (fields[3] == "-") ? Square::None : to_square(fields[3]);
 
-    pos.halfmoveClock_ = std::stoi(std::string(fields[4]));
-    pos.fullmoveNumber_ = std::stoi(std::string(fields[5]));
+    if (fields.size() > 4)
+        pos.halfmoveClock_ = std::stoi(std::string(fields[4]));
+    if (fields.size() > 5)
+        pos.fullmoveNumber_ = std::stoi(std::string(fields[5]));
 
     return pos;
 }
@@ -145,13 +148,12 @@ void Position::makeMove(Move m, UndoInfo& undo) noexcept {
     undo = UndoInfo{
         .captured = Piece::None,
         .castlingRights = castlingRights_,
-        .epSquare = enPassantSquare_,
-        .hash = hash_
+        .enPassantSquare = enPassantSquare_,
+        .hash = hash_,
     };
-    
+
     const Square from = m.from();
     const Square to = m.to();
-    const Piece movingPiece = pieceOn(from);
 
     enPassantSquare_ = Square::None;
 
@@ -167,9 +169,10 @@ void Position::makeMove(Move m, UndoInfo& undo) noexcept {
             break;
         }
         case MoveType::PawnDoubleStep: {
-            movePiece(from, to);
-            const Direction dir = (sideToMove_ == Color::White) ? Direction::North : Direction::South;
+            const Direction dir = (sideToMove_ == Color::White) ? Direction::South : Direction::North;
             enPassantSquare_ = to + dir;
+            undo.enPassantSquare = enPassantSquare_;
+            movePiece(from, to);
             break;
         }
         case MoveType::EnPassant: {
@@ -224,20 +227,20 @@ void Position::makeMove(Move m, UndoInfo& undo) noexcept {
             break;
     }
 
-    updateCastlingRights(from, to, movingPiece);
+    updateCastlingRights(from, to);
+    kingSquare_[to_underlying(sideToMove_)] = static_cast<Square>(get_lsb(get(sideToMove_, PieceType::King)));
     sideToMove_ = ~sideToMove_;
 }
 
 void Position::undoMove(Move m, const UndoInfo& undo) noexcept {
     castlingRights_ = undo.castlingRights;
-    enPassantSquare_ = undo.epSquare;
+    enPassantSquare_ = undo.enPassantSquare;
     hash_ = undo.hash;
-    
+
     sideToMove_ = ~sideToMove_;
 
     const Square from = m.from();
     const Square to = m.to();
-    const Piece movingPiece = pieceOn(to);
 
     switch (m.moveType()) {
         case MoveType::Normal: {
@@ -298,10 +301,11 @@ void Position::undoMove(Move m, const UndoInfo& undo) noexcept {
             putPiece(from, make_piece(sideToMove_, PieceType::Pawn));
             putPiece(to, undo.captured);
             break;
+        }
         default:
             break;
-        }
     }
+    kingSquare_[to_underlying(sideToMove_)] = static_cast<Square>(get_lsb(get(sideToMove_, PieceType::King)));
 }
 
 void Position::removePiece(Square sq) noexcept {
@@ -325,7 +329,7 @@ void Position::movePiece(Square from, Square to) noexcept {
     putPiece(to, piece);
 }
 
-void Position::updateCastlingRights(Square from, Square to, Piece movingPiece) noexcept {
+void Position::updateCastlingRights(Square from, Square to) noexcept {
     const uint8_t mask = kCastleMask[to_underlying(from)] & kCastleMask[to_underlying(to)];
-    castlingRights_ = castlingRights_ & static_cast<CastlingRights>(mask);
+    castlingRights_ &= static_cast<CastlingRights>(mask);
 }

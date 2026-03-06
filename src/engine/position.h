@@ -6,7 +6,7 @@
 struct UndoInfo {
     Piece captured = Piece::None;
     CastlingRights castlingRights{};
-    Square epSquare = Square::None;
+    Square enPassantSquare = Square::None;
     Key hash{};
 };
 static_assert(sizeof(UndoInfo) == 16);
@@ -63,6 +63,6 @@ private:
     void removePiece(Square sq) noexcept;
     void putPiece(Square sq, Piece piece) noexcept;
     void movePiece(Square from, Square to) noexcept;
-    void updateCastlingRights(Square from, Square to, Piece movingPiece) noexcept;
+    void updateCastlingRights(Square from, Square to) noexcept;
 };
 static_assert(sizeof(Position) == 200);

@@ -1,8 +1,8 @@
 #pragma once
+#include "../geometry.h"
 #include "../position.h"
 #include "../util.h"
 #include "attacks.h"
-#include "../geometry.h"
 
 // List of moves, with a max size of 256 (max moves in any given position is known to be 218)
 struct MoveList {

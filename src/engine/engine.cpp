@@ -1,6 +1,6 @@
-#include <iostream>
-
 #include "engine.h"
+
+#include <iostream>
 
 int main() {
     engine_init();
