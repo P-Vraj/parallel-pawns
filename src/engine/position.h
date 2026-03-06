@@ -3,6 +3,14 @@
 
 #include "types.h"
 
+struct UndoInfo {
+    Piece captured = Piece::None;
+    CastlingRights castlingRights{};
+    Square enPassantSquare = Square::None;
+    Key hash{};
+};
+static_assert(sizeof(UndoInfo) == 16);
+
 struct Position {
     // Returns the bitboard of pieces of the given color and piece type.
     template <Color C, PieceType PT>
@@ -14,10 +22,7 @@ struct Position {
     // Returns the piece on the given square, or Piece::None if the square is empty.
     constexpr Piece pieceOn(Square sq) const { return pieceMap_[to_underlying(sq)]; }
     // Returns the bitboard of pieces of the given color
-    template <Color C>
-    constexpr Bitboard occupancy() const {
-        return colorOccupied_[to_underlying(C)];
-    }
+    constexpr Bitboard occupancy(Color c) const { return colorOccupied_[to_underlying(c)]; }
     // Returns the bitboard of all occupied squares.
     constexpr Bitboard occupancy() const { return occupied_; }
     constexpr Square kingSquare(Color c) const noexcept { return kingSquare_[to_underlying(c)]; }
@@ -27,13 +32,16 @@ struct Position {
     constexpr Key hash() const noexcept { return hash_; }
     constexpr uint16_t fullmoveNumber() const noexcept { return fullmoveNumber_; }
     constexpr uint8_t halfmoveClock() const noexcept { return halfmoveClock_; }
-    constexpr int16_t evaluation() const noexcept { return evaluationScore_; }
-    constexpr void setEvaluation(int16_t score) noexcept { evaluationScore_ = score; }
 
     // Creates a Position from a FEN string. Assumes the FEN is valid and well-formed.
     static Position fromFEN(std::string_view fen);
     // Converts the Position back to a FEN string.
     std::string toFEN() const;
+
+    // Makes the given move on the position, updating the position and filling in the undo information.
+    void makeMove(Move m, UndoInfo& undo) noexcept;
+    // Undoes the given move using the provided undo information, restoring the position to its previous state.
+    void undoMove(Move m, const UndoInfo& undo) noexcept;
 
 private:
     std::array<std::array<Bitboard, to_underlying(PieceType::Count) - 1>, to_underlying(Color::Count)> pieces_;
@@ -45,7 +53,6 @@ private:
     CastlingRights castlingRights_;
     uint16_t fullmoveNumber_;
     uint8_t halfmoveClock_;
-    int16_t evaluationScore_ = 0;
     Square enPassantSquare_;
     Key hash_;
 
@@ -53,6 +60,9 @@ private:
     void parseCastlingRights_(std::string_view castling) noexcept;
     // Fills the piece bitboards and occupancy bitboards based on the pieceMap_.
     void fillBitboards_() noexcept;
+    void removePiece(Square sq) noexcept;
+    void putPiece(Square sq, Piece piece) noexcept;
+    void movePiece(Square from, Square to) noexcept;
+    void updateCastlingRights(Square from, Square to) noexcept;
 };
-
-// static_assert(sizeof(Position) == 200);
+static_assert(sizeof(Position) == 200);

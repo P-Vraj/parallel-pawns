@@ -7,6 +7,7 @@ using std::to_underlying, std::size_t;
 
 using Bitboard = uint64_t;
 using Key = uint64_t;
+using Eval = int16_t;
 
 // clang-format off
 enum class Square : uint8_t {
@@ -187,7 +188,15 @@ constexpr bool is_valid(File f, Rank r) noexcept {
 }
 
 constexpr inline Bitboard bitboard(Square sq) noexcept {
-    return 1ULL << to_underlying(sq);
+    return static_cast<Bitboard>(1ULL << to_underlying(sq));
+}
+
+constexpr inline Bitboard bitboard(Rank r) noexcept {
+    return static_cast<Bitboard>(0xFFULL << (to_underlying(r) * 8));
+}
+
+constexpr inline Bitboard bitboard(File f) noexcept {
+    return static_cast<Bitboard>(0x0101010101010101ULL << to_underlying(f));
 }
 
 enum class Color : uint8_t {
@@ -260,20 +269,24 @@ enum class CastlingRights : uint8_t {
 // clang-format on
 
 // NOLINTBEGIN(clang-analyzer-optin.core.EnumCastOutOfRange): Disable linting as CastlingRights is used as a bitfield
-constexpr CastlingRights operator|(CastlingRights a, CastlingRights b) {
+constexpr CastlingRights operator|(CastlingRights a, CastlingRights b) noexcept {
     return static_cast<CastlingRights>(static_cast<uint8_t>(a) | static_cast<uint8_t>(b));
 }
 
-constexpr CastlingRights operator&(CastlingRights a, CastlingRights b) {
+constexpr CastlingRights operator&(CastlingRights a, CastlingRights b) noexcept {
     return static_cast<CastlingRights>(static_cast<uint8_t>(a) & static_cast<uint8_t>(b));
 }
 
-constexpr CastlingRights& operator|=(CastlingRights& a, CastlingRights b) {
+constexpr CastlingRights& operator|=(CastlingRights& a, CastlingRights b) noexcept {
     return a = a | b;
 }
 
-constexpr CastlingRights& operator&=(CastlingRights& a, CastlingRights b) {
+constexpr CastlingRights& operator&=(CastlingRights& a, CastlingRights b) noexcept {
     return a = a & b;
+}
+
+constexpr bool has_right(CastlingRights rights, CastlingRights flag) noexcept {
+    return (rights & flag) != CastlingRights::None;
 }
 // NOLINTEND(clang-analyzer-optin.core.EnumCastOutOfRange)
 
@@ -306,39 +319,29 @@ struct Move {
     // Bits 6-11:   To square
     // Bits 12-15:  Move type
 
-    constexpr Move() : data_(0) {}
-    constexpr explicit Move(uint16_t data) : data_(data) {}
-    constexpr Move(Square from, Square to) : data_(to_underlying(from) | (to_underlying(to) << 6)) {}
-    constexpr Move(Square from, Square to, MoveType moveType)
+    constexpr Move() noexcept : data_(0) {}
+    constexpr explicit Move(uint16_t data) noexcept : data_(data) {}
+    constexpr Move(Square from, Square to) noexcept : data_(to_underlying(from) | (to_underlying(to) << 6)) {}
+    constexpr Move(Square from, Square to, MoveType moveType) noexcept
         : data_(to_underlying(from) | (to_underlying(to) << 6) | (to_underlying(moveType) << 12)) {}
 
-    constexpr uint16_t data() const { return data_; }
-    constexpr bool operator==(const Move& other) const { return data_ == other.data_; }
-    constexpr bool operator!=(const Move& other) const { return data_ != other.data_; }
-    constexpr explicit operator bool() const { return data_ != 0; }
+    constexpr uint16_t data() const noexcept { return data_; }
+    constexpr bool operator==(const Move& other) const noexcept { return data_ == other.data_; }
+    constexpr bool operator!=(const Move& other) const noexcept { return data_ != other.data_; }
+    constexpr explicit operator bool() const noexcept { return data_ != 0; }
 
-    constexpr Square from() const { return static_cast<Square>(data_ & 63); }
-    constexpr Square to() const { return static_cast<Square>((data_ >> 6) & 63); }
-    constexpr MoveType moveType() const { return static_cast<MoveType>(data_ >> 12); }
-    static constexpr Move none() { return Move{}; }
-    constexpr bool isNormal() const { return (data_ >> 12) == to_underlying(MoveType::Normal); }
-    constexpr bool isCapture() const { return data_ & (0b1000 << 12); }
-    constexpr bool isPromotion() const { return data_ & (0b0100 << 12); }
+    constexpr Square from() const noexcept { return static_cast<Square>(data_ & 63); }
+    constexpr Square to() const noexcept { return static_cast<Square>((data_ >> 6) & 63); }
+    constexpr MoveType moveType() const noexcept { return static_cast<MoveType>(data_ >> 12); }
+    static constexpr Move none() noexcept { return Move{}; }
+    constexpr bool isNormal() const noexcept { return (data_ >> 12) == to_underlying(MoveType::Normal); }
+    constexpr bool isCapture() const noexcept { return data_ & (0b1000 << 12); }
+    constexpr bool isPromotion() const noexcept { return data_ & (0b0100 << 12); }
     // Only call this if `isPromotion()` == true
-    constexpr PieceType promotionType() const {
+    constexpr PieceType promotionType() const noexcept {
         return static_cast<PieceType>((data_ >> 12 & 0b0011) + to_underlying(PieceType::Knight));
     }
 
 private:
     uint16_t data_;
-};
-
-constexpr int piece_values[] = {
-    0,   // None
-    100, // Pawn
-    320, // Knight
-    330, // Bishop
-    500, // Rook
-    900, // Queen
-    20000, // King
 };
