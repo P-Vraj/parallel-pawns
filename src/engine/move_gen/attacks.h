@@ -4,6 +4,7 @@
 
 namespace attacks {
 
+// Initializes the attack tables for rooks and bishops. Must be called at startup.
 inline void init_attack_tables() noexcept {
     init_rook_attacks_table();
     init_bishop_attacks_table();
@@ -35,6 +36,21 @@ inline Bitboard king_attacks(Square sq) noexcept {
 
 inline Bitboard pawn_attacks(Color c, Square sq) noexcept {
     return kPawnAttacksTable[to_underlying(c)][to_underlying(sq)];
+}
+
+// Returns a bitboard of squares attacked by a piece of the given type for the square and (optional) occupancy.
+template <PieceType PT>
+    requires(PT == PieceType::Knight || PT == PieceType::Bishop || PT == PieceType::Rook || PT == PieceType::Queen)
+inline constexpr Bitboard piece_attacks(Square sq, Bitboard occ) noexcept {
+    if constexpr (PT == PieceType::Knight)
+        return knight_attacks(sq);
+    if constexpr (PT == PieceType::Bishop)
+        return bishop_attacks(sq, occ);
+    if constexpr (PT == PieceType::Rook)
+        return rook_attacks(sq, occ);
+    if constexpr (PT == PieceType::Queen)
+        return queen_attacks(sq, occ);
+    return Bitboard{ 0 };
 }
 
 }  // namespace attacks

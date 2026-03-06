@@ -140,3 +140,192 @@ void Position::fillBitboards_() noexcept {
         set_bit(occupied_, static_cast<Square>(sq));
     }
 }
+
+void Position::makeMove(Move m, UndoInfo& undo) noexcept {
+    undo = UndoInfo{
+        .captured = Piece::None,
+        .castlingRights = castlingRights_,
+        .epSquare = enPassantSquare_,
+        .hash = hash_
+    };
+    
+    const Square from = m.from();
+    const Square to = m.to();
+    const Piece movingPiece = pieceOn(from);
+
+    enPassantSquare_ = Square::None;
+
+    switch (m.moveType()) {
+        case MoveType::Normal: {
+            movePiece(from, to);
+            break;
+        }
+        case MoveType::Capture: {
+            undo.captured = pieceOn(to);
+            removePiece(to);
+            movePiece(from, to);
+            break;
+        }
+        case MoveType::PawnDoubleStep: {
+            movePiece(from, to);
+            const Direction dir = (sideToMove_ == Color::White) ? Direction::North : Direction::South;
+            enPassantSquare_ = to + dir;
+            break;
+        }
+        case MoveType::EnPassant: {
+            const Direction dir = (sideToMove_ == Color::White) ? Direction::South : Direction::North;
+            const Square capturedPawnSquare = to + dir;
+            undo.captured = pieceOn(capturedPawnSquare);
+            removePiece(capturedPawnSquare);
+            movePiece(from, to);
+            break;
+        }
+        case MoveType::CastleKing: {
+            const bool white = (sideToMove_ == Color::White);
+            const Square kingFrom = white ? Square::E1 : Square::E8;
+            const Square kingTo = white ? Square::G1 : Square::G8;
+            const Square rookFrom = white ? Square::H1 : Square::H8;
+            const Square rookTo = white ? Square::F1 : Square::F8;
+
+            movePiece(kingFrom, kingTo);
+            movePiece(rookFrom, rookTo);
+            break;
+        }
+        case MoveType::CastleQueen: {
+            const bool white = (sideToMove_ == Color::White);
+            const Square kingFrom = white ? Square::E1 : Square::E8;
+            const Square kingTo = white ? Square::C1 : Square::C8;
+            const Square rookFrom = white ? Square::A1 : Square::A8;
+            const Square rookTo = white ? Square::D1 : Square::D8;
+
+            movePiece(kingFrom, kingTo);
+            movePiece(rookFrom, rookTo);
+            break;
+        }
+        case MoveType::PromotionKnight:
+        case MoveType::PromotionBishop:
+        case MoveType::PromotionRook:
+        case MoveType::PromotionQueen: {
+            removePiece(from);
+            putPiece(to, make_piece(sideToMove_, m.promotionType()));
+            break;
+        }
+        case MoveType::PromotionCaptureKnight:
+        case MoveType::PromotionCaptureBishop:
+        case MoveType::PromotionCaptureRook:
+        case MoveType::PromotionCaptureQueen: {
+            undo.captured = pieceOn(to);
+            removePiece(to);
+            removePiece(from);
+            putPiece(to, make_piece(sideToMove_, m.promotionType()));
+            break;
+        }
+        default:
+            break;
+    }
+
+    updateCastlingRights(from, to, movingPiece);
+    sideToMove_ = ~sideToMove_;
+}
+
+void Position::undoMove(Move m, const UndoInfo& undo) noexcept {
+    castlingRights_ = undo.castlingRights;
+    enPassantSquare_ = undo.epSquare;
+    hash_ = undo.hash;
+    
+    sideToMove_ = ~sideToMove_;
+
+    const Square from = m.from();
+    const Square to = m.to();
+    const Piece movingPiece = pieceOn(to);
+
+    switch (m.moveType()) {
+        case MoveType::Normal: {
+            movePiece(to, from);
+            break;
+        }
+        case MoveType::Capture: {
+            movePiece(to, from);
+            putPiece(to, undo.captured);
+            break;
+        }
+        case MoveType::PawnDoubleStep: {
+            movePiece(to, from);
+            break;
+        }
+        case MoveType::EnPassant: {
+            const Direction dir = (sideToMove_ == Color::White) ? Direction::South : Direction::North;
+            const Square capturedPawnSquare = to + dir;
+            movePiece(to, from);
+            putPiece(capturedPawnSquare, undo.captured);
+            break;
+        }
+        case MoveType::CastleKing: {
+            const bool white = (sideToMove_ == Color::White);
+            const Square kingFrom = white ? Square::E1 : Square::E8;
+            const Square kingTo = white ? Square::G1 : Square::G8;
+            const Square rookFrom = white ? Square::H1 : Square::H8;
+            const Square rookTo = white ? Square::F1 : Square::F8;
+
+            movePiece(kingTo, kingFrom);
+            movePiece(rookTo, rookFrom);
+            break;
+        }
+        case MoveType::CastleQueen: {
+            const bool white = (sideToMove_ == Color::White);
+            const Square kingFrom = white ? Square::E1 : Square::E8;
+            const Square kingTo = white ? Square::C1 : Square::C8;
+            const Square rookFrom = white ? Square::A1 : Square::A8;
+            const Square rookTo = white ? Square::D1 : Square::D8;
+
+            movePiece(kingTo, kingFrom);
+            movePiece(rookTo, rookFrom);
+            break;
+        }
+        case MoveType::PromotionKnight:
+        case MoveType::PromotionBishop:
+        case MoveType::PromotionRook:
+        case MoveType::PromotionQueen: {
+            removePiece(to);
+            putPiece(from, make_piece(sideToMove_, PieceType::Pawn));
+            break;
+        }
+        case MoveType::PromotionCaptureKnight:
+        case MoveType::PromotionCaptureBishop:
+        case MoveType::PromotionCaptureRook:
+        case MoveType::PromotionCaptureQueen: {
+            removePiece(to);
+            putPiece(from, make_piece(sideToMove_, PieceType::Pawn));
+            putPiece(to, undo.captured);
+            break;
+        default:
+            break;
+        }
+    }
+}
+
+void Position::removePiece(Square sq) noexcept {
+    const Piece piece = pieceOn(sq);
+    pieceMap_[to_underlying(sq)] = Piece::None;
+    clear_bit(pieces_[to_underlying(color(piece))][to_underlying(piece_type(piece)) - 1], sq);
+    clear_bit(colorOccupied_[to_underlying(color(piece))], sq);
+    clear_bit(occupied_, sq);
+}
+
+void Position::putPiece(Square sq, Piece piece) noexcept {
+    pieceMap_[to_underlying(sq)] = piece;
+    set_bit(pieces_[to_underlying(color(piece))][to_underlying(piece_type(piece)) - 1], sq);
+    set_bit(colorOccupied_[to_underlying(color(piece))], sq);
+    set_bit(occupied_, sq);
+}
+
+void Position::movePiece(Square from, Square to) noexcept {
+    const Piece piece = pieceOn(from);
+    removePiece(from);
+    putPiece(to, piece);
+}
+
+void Position::updateCastlingRights(Square from, Square to, Piece movingPiece) noexcept {
+    const uint8_t mask = kCastleMask[to_underlying(from)] & kCastleMask[to_underlying(to)];
+    castlingRights_ = castlingRights_ & static_cast<CastlingRights>(mask);
+}

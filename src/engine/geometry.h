@@ -3,17 +3,6 @@
 
 namespace geom {
 
-namespace internal {
-constexpr inline Bitboard kFileA = 0x0101010101010101ULL;
-constexpr inline Bitboard kFileH = 0x8080808080808080ULL;
-constexpr inline Bitboard kRank1 = 0x00000000000000FFULL;
-constexpr inline Bitboard kRank8 = 0xFF00000000000000ULL;
-};  // namespace internal
-
-extern std::array<std::array<Bitboard, 64>, 64> line_table;
-extern std::array<std::array<Bitboard, 64>, 64> between_table;
-extern std::array<std::array<Bitboard, 64>, 64> ray_pass_table;
-
 // clang-format off
 constexpr inline std::array<Direction, 8> kDirections = {
     Direction::North, Direction::South, Direction::East, Direction::West,
@@ -42,30 +31,6 @@ constexpr inline size_t direction_index(Direction dir) noexcept {
             return 7;
         default:
             return 8;  // Invalid direction index
-    }
-}
-// Checks if a piece on the given square can step in the given direction without going off the board
-constexpr bool can_step(Square sq, Direction dir) noexcept {
-    const Bitboard bb = bitboard(sq);
-    switch (dir) {
-        case Direction::North:
-            return (bb & internal::kRank8) == 0;
-        case Direction::South:
-            return (bb & internal::kRank1) == 0;
-        case Direction::East:
-            return (bb & internal::kFileH) == 0;
-        case Direction::West:
-            return (bb & internal::kFileA) == 0;
-        case Direction::NorthEast:
-            return (bb & (internal::kRank8 | internal::kFileH)) == 0;
-        case Direction::NorthWest:
-            return (bb & (internal::kRank8 | internal::kFileA)) == 0;
-        case Direction::SouthEast:
-            return (bb & (internal::kRank1 | internal::kFileH)) == 0;
-        case Direction::SouthWest:
-            return (bb & (internal::kRank1 | internal::kFileA)) == 0;
-        default:
-            return false;
     }
 }
 constexpr inline std::array<std::array<Square, 8>, 64> make_step_table() noexcept {
@@ -104,6 +69,9 @@ constexpr inline Square step(Square sq, Direction dir) noexcept {
     return kStepTable[to_underlying(sq)][direction_index(dir)];
 }
 
+extern std::array<std::array<Bitboard, 64>, 64> line_table;
+extern std::array<std::array<Bitboard, 64>, 64> between_table;
+extern std::array<std::array<Bitboard, 64>, 64> ray_pass_table;
 // Initializes the line, between, and ray_pass tables.
 void init_geometry_tables() noexcept;
 // Returns bitboard of squares strictly between a and b (excluding a and b), or 0 if a and b are not aligned.

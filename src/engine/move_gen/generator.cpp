@@ -2,18 +2,31 @@
 
 namespace {
 
-struct Context {
-    Color us{}, them{};
-    Square ksq{};
-    Bitboard occ{}, usOcc{}, themOcc{};
-    Bitboard checkers{};
-    int numCheckers{};
-    PinsInfo pins{};
-    Bitboard evasionMask{};
-};
+void push_simple_moves(Square from, Bitboard targets, Bitboard themOcc, MoveList& moveList) noexcept {
+    while (targets) {
+        const auto to = static_cast<Square>(pop_lsb(targets));
+        const MoveType moveType = (themOcc & bitboard(to)) ? MoveType::Capture : MoveType::Normal;
+        moveList.push_back(Move(from, to, moveType));
+    }
+}
+
+void push_promotions(Square from, Square to, bool isCapture, MoveList& moveList) noexcept {
+    if (!isCapture) {
+        moveList.push_back(Move(from, to, MoveType::PromotionQueen));
+        moveList.push_back(Move(from, to, MoveType::PromotionRook));
+        moveList.push_back(Move(from, to, MoveType::PromotionBishop));
+        moveList.push_back(Move(from, to, MoveType::PromotionKnight));
+    }
+    else {
+        moveList.push_back(Move(from, to, MoveType::PromotionCaptureQueen));
+        moveList.push_back(Move(from, to, MoveType::PromotionCaptureRook));
+        moveList.push_back(Move(from, to, MoveType::PromotionCaptureBishop));
+        moveList.push_back(Move(from, to, MoveType::PromotionCaptureKnight));
+    }
+}
 
 // Generates the evasion mask for a king in check by a single piece.
-Bitboard evasion_mask_single(const Position& pos, Square kingSq, Bitboard checkers) noexcept {
+Bitboard evasion_mask(const Position& pos, Square kingSq, Bitboard checkers) noexcept {
     const auto checkerSq = static_cast<Square>(get_lsb(checkers));
     const Piece checkerPiece = pos.pieceOn(checkerSq);
     const PieceType pt = piece_type(checkerPiece);
@@ -26,40 +39,242 @@ Bitboard evasion_mask_single(const Position& pos, Square kingSq, Bitboard checke
     return mask;
 }
 
+// Holds state relevant to move generation, to avoid redundant accesses/computations during move generation.
+struct State {
+    PinsInfo pins{};
+    Bitboard occ{}, usOcc{}, themOcc{};
+    Bitboard checkers{};
+    Bitboard evasionMask{};
+    Color us{}, them{};
+    Square kingSq{};
+    uint8_t numCheckers{};
+};
+
+State init_state(const Position& pos) noexcept {
+    State state{};
+
+    state.us = pos.sideToMove();
+    state.them = ~state.us;
+    state.kingSq = pos.kingSquare(state.us);
+    state.occ = pos.occupancy();
+    state.usOcc = pos.occupancy(state.us);
+    state.themOcc = pos.occupancy(state.them);
+    state.checkers = checkers(pos, state.us);
+    state.numCheckers = bit_count(state.checkers);
+    state.pins = compute_pins(pos, state.us);
+    state.evasionMask = (state.numCheckers == 1) ? evasion_mask(pos, state.kingSq, state.checkers) : ~Bitboard{ 0 };
+
+    return state;
+}
+
+void generate_king_moves(const Position& pos, const State& state, MoveList& moveList) noexcept {
+    Bitboard targets = attacks::king_attacks(state.kingSq) & ~state.usOcc;
+    while (targets) {
+        const auto to = static_cast<Square>(pop_lsb(targets));
+        // Build occupancy after king moves (remove king, capture if enemy present, place king)
+        Bitboard afterKingMoveOcc = state.occ;
+        afterKingMoveOcc ^= bitboard(state.kingSq);
+        if (state.themOcc & bitboard(to))
+            afterKingMoveOcc ^= bitboard(to);
+        afterKingMoveOcc |= bitboard(to);
+        // Ensure king doesn't move into check
+        if (!is_square_attacked(pos, to, state.them, afterKingMoveOcc)) {
+            const MoveType moveType = (state.themOcc & bitboard(to)) ? MoveType::Capture : MoveType::Normal;
+            moveList.push_back(Move(state.kingSq, to, moveType));
+        }
+    }
+}
+
+template <PieceType PT>
+void generate_piece_moves(const Position& pos, const State& state, MoveList& moveList) {
+    Bitboard pieces = pos.get(state.us, PT);
+    while (pieces) {
+        const auto from = static_cast<Square>(pop_lsb(pieces));
+        Bitboard targets = attacks::piece_attacks<PT>(from, state.occ) & ~state.usOcc;
+
+        targets &= state.pins.pinRay[to_underlying(from)];
+        targets &= state.evasionMask;
+
+        push_simple_moves(from, targets, state.themOcc, moveList);
+    }
+}
+
+void push_pawn_targets(
+    Square from,
+    Bitboard targets,
+    Bitboard themOcc,
+    Color us,
+    MoveType baseMoveType,
+    MoveList& moveList
+) noexcept {
+    const Bitboard promotionMask = us == Color::White ? bitboard(Rank::R8) : bitboard(Rank::R1);
+    Bitboard promoTargets = targets & promotionMask;
+    Bitboard nonPromoTargets = targets & ~promotionMask;
+
+    while (promoTargets) {
+        const auto to = static_cast<Square>(pop_lsb(promoTargets));
+        const bool isCapture = (themOcc & bitboard(to)) != 0;
+        push_promotions(from, to, isCapture, moveList);
+    }
+    while (nonPromoTargets) {
+        const auto to = static_cast<Square>(pop_lsb(nonPromoTargets));
+        const MoveType moveType = (themOcc & bitboard(to)) ? MoveType::Capture : baseMoveType;
+        moveList.push_back(Move(from, to, moveType));
+    }
+}
+
+void generate_pawn_moves(const Position& pos, const State& state, MoveList& moveList) noexcept {
+    const Bitboard pawns = pos.get(state.us, PieceType::Pawn);
+    // Captures
+    {
+        Bitboard p = pawns;
+        while (p) {
+            const auto from = static_cast<Square>(pop_lsb(p));
+            Bitboard targets = attacks::pawn_attacks(state.us, from) & state.themOcc;
+            targets &= state.pins.pinRay[to_underlying(from)] & state.evasionMask;
+            push_pawn_targets(from, targets, state.themOcc, state.us, MoveType::Normal, moveList);
+        }
+    }
+    // Pushes
+    {
+        Bitboard p = pawns;
+        while (p) {
+            // Single push
+            const auto from = static_cast<Square>(pop_lsb(p));
+            const Bitboard filter = state.pins.pinRay[to_underlying(from)] & state.evasionMask;
+            const Direction dir = (state.us == Color::White) ? Direction::North : Direction::South;
+            const Square singlePushTo = geom::step(from, dir);
+            if (!is_valid(singlePushTo) || (state.occ & bitboard(singlePushTo)) != 0)
+                continue;
+
+            const Bitboard singleTargets = bitboard(singlePushTo) & filter;
+            push_pawn_targets(from, singleTargets, state.themOcc, state.us, MoveType::Normal, moveList);
+
+            // Double push (only if single push was also valid)
+            const Rank startRank = (state.us == Color::White) ? Rank::R2 : Rank::R7;
+            if (rank(from) == startRank) {
+                const Square doublePushTo = geom::step(singlePushTo, dir);
+                if (!is_valid(doublePushTo) || (state.occ & bitboard(doublePushTo)) != 0)
+                    continue;
+                const Bitboard doubleTargets = bitboard(doublePushTo) & filter;
+                push_pawn_targets(from, doubleTargets, state.themOcc, state.us, MoveType::PawnDoubleStep, moveList);
+            }
+        }
+    }
+}
+
+void generate_castling_moves(const Position& pos, const State& state, MoveList& moveList) noexcept {
+    if (state.numCheckers > 0)
+        return;
+
+    const CastlingRights mask = (state.us == Color::White)
+                                    ? (CastlingRights::WhiteKingside | CastlingRights::WhiteQueenside)
+                                    : (CastlingRights::BlackKingside | CastlingRights::BlackQueenside);
+    const CastlingRights cr = pos.castlingRights() & mask;
+    if (cr == CastlingRights::None)
+        return;
+
+    if (state.us == Color::White) {
+        if (has_right(cr, CastlingRights::WhiteKingside)) {
+            const Square from = Square::E1;
+            const Square to = Square::G1;
+            const Bitboard fullPath = geom::between_or_to(from, to);
+            if ((state.occ & fullPath) == 0 && !is_any_square_attacked(pos, fullPath, state.them)) {
+                moveList.push_back(Move(from, to, MoveType::CastleKing));
+            }
+        }
+        if (has_right(cr, CastlingRights::WhiteQueenside)) {
+            const Square from = Square::E1;
+            const Square to = Square::C1;
+            // Ensure the full path is clear, and that the king's path isn't attacked
+            const Bitboard kingPath = geom::between_or_to(from, to);
+            const Bitboard fullPath = geom::between_or_to(from, Square::B1);
+            if ((state.occ & fullPath) == 0 && !is_any_square_attacked(pos, kingPath, state.them)) {
+                moveList.push_back(Move(from, to, MoveType::CastleQueen));
+            }
+        }
+    }
+    else {
+        if (has_right(cr, CastlingRights::BlackKingside)) {
+            const Square from = Square::E8;
+            const Square to = Square::G8;
+            const Bitboard fullPath = geom::between_or_to(from, to);
+            if ((state.occ & fullPath) == 0 && !is_any_square_attacked(pos, fullPath, state.them)) {
+                moveList.push_back(Move(from, to, MoveType::CastleKing));
+            }
+        }
+        if (has_right(cr, CastlingRights::BlackQueenside)) {
+            const Square from = Square::E8;
+            const Square to = Square::C8;
+            // Ensure the full path is clear, and that the king's path isn't attacked
+            const Bitboard kingPath = geom::between_or_to(from, to);
+            const Bitboard fullPath = geom::between_or_to(from, Square::B8);
+            if ((state.occ & fullPath) == 0 && !is_any_square_attacked(pos, kingPath, state.them)) {
+                moveList.push_back(Move(from, to, MoveType::CastleQueen));
+            }
+        }
+    }
+}
+
+void generate_en_passant_moves(const Position& pos, const State& state, MoveList& moveList) noexcept {
+    const Square epSq = pos.epSquare();
+    if (!is_valid(epSq))
+        return;
+    
+    const Color us = state.us;
+    const Bitboard pinAndEvasionMask = state.pins.pinRay[to_underlying(epSq)] & state.evasionMask;
+    Bitboard pawns = pos.get(us, PieceType::Pawn) & attacks::pawn_attacks(state.them, epSq) & pinAndEvasionMask;
+
+    while (pawns) {
+        const Square from = static_cast<Square>(pop_lsb(pawns));
+        moveList.push_back(Move(from, epSq, MoveType::EnPassant));
+    }
+}
+
 }  // namespace
 
 Bitboard checkers(const Position& pos, Color us) noexcept {
-    using namespace attacks;
     const Color opp = ~us;
     const Square kingSq = pos.kingSquare(us);
     const Bitboard occupied = pos.occupancy();
 
     Bitboard checkers = 0;
-    checkers |= pawn_attacks(us, kingSq) & pos.get(opp, PieceType::Pawn);
-    checkers |= knight_attacks(kingSq) & pos.get(opp, PieceType::Knight);
-    checkers |= bishop_attacks(kingSq, occupied) & pos.get(opp, PieceType::Bishop);
-    checkers |= rook_attacks(kingSq, occupied) & pos.get(opp, PieceType::Rook);
-    checkers |= queen_attacks(kingSq, occupied) & pos.get(opp, PieceType::Queen);
+    checkers |= attacks::pawn_attacks(us, kingSq) & pos.get(opp, PieceType::Pawn);
+    checkers |= attacks::knight_attacks(kingSq) & pos.get(opp, PieceType::Knight);
+    checkers |= attacks::bishop_attacks(kingSq, occupied) & pos.get(opp, PieceType::Bishop);
+    checkers |= attacks::rook_attacks(kingSq, occupied) & pos.get(opp, PieceType::Rook);
+    checkers |= attacks::queen_attacks(kingSq, occupied) & pos.get(opp, PieceType::Queen);
     return checkers;
 }
 
-bool is_square_attacked(const Position& pos, Square sq, Color by) noexcept {
-    using namespace attacks;
+bool is_square_attacked(const Position& pos, Square sq, Color by, Bitboard occupied) noexcept {
     const Color opp = ~by;
-    const Bitboard occupied = pos.occupancy();
 
-    if (pawn_attacks(opp, sq) & pos.get(by, PieceType::Pawn))
+    if (attacks::pawn_attacks(opp, sq) & pos.get(by, PieceType::Pawn))
         return true;
-    if (knight_attacks(sq) & pos.get(by, PieceType::Knight))
+    if (attacks::knight_attacks(sq) & pos.get(by, PieceType::Knight))
         return true;
-    if (bishop_attacks(sq, occupied) & pos.get(by, PieceType::Bishop))
+    if (attacks::bishop_attacks(sq, occupied) & pos.get(by, PieceType::Bishop))
         return true;
-    if (rook_attacks(sq, occupied) & pos.get(by, PieceType::Rook))
+    if (attacks::rook_attacks(sq, occupied) & pos.get(by, PieceType::Rook))
         return true;
-    if (queen_attacks(sq, occupied) & pos.get(by, PieceType::Queen))
+    if (attacks::queen_attacks(sq, occupied) & pos.get(by, PieceType::Queen))
         return true;
-    if (king_attacks(sq) & pos.get(by, PieceType::King))
+    if (attacks::king_attacks(sq) & pos.get(by, PieceType::King))
         return true;
+    return false;
+}
+
+bool is_square_attacked(const Position& pos, Square sq, Color by) noexcept {
+    return is_square_attacked(pos, sq, by, pos.occupancy());
+}
+
+bool is_any_square_attacked(const Position& pos, Bitboard b, Color by) noexcept {
+    while (b) {
+        const auto sq = static_cast<Square>(pop_lsb(b));
+        if (is_square_attacked(pos, sq, by))
+            return true;
+    }
     return false;
 }
 
@@ -101,6 +316,22 @@ PinsInfo compute_pins(const Position& pos, Color us) noexcept {
     return pins;
 }
 
-void generate_moves(const Position& pos, MoveList& moveList) noexcept {}
+void generate_moves(const Position& pos, MoveList& moveList) noexcept {
+    moveList.clear();
+    const State state = init_state(pos);
 
-void king_moves(const Position& pos, MoveList& moveList) noexcept {}
+    generate_king_moves(pos, state, moveList);
+    // Only king moves possible in double check
+    if (state.numCheckers >= 2)
+        return;
+
+    generate_piece_moves<PieceType::Knight>(pos, state, moveList);
+    generate_piece_moves<PieceType::Bishop>(pos, state, moveList);
+    generate_piece_moves<PieceType::Rook>(pos, state, moveList);
+    generate_piece_moves<PieceType::Queen>(pos, state, moveList);
+
+    generate_pawn_moves(pos, state, moveList);
+
+    generate_castling_moves(pos, state, moveList);
+    generate_en_passant_moves(pos, state, moveList);
+}
