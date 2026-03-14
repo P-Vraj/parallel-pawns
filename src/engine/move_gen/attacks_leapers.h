@@ -44,8 +44,8 @@ constexpr std::array<Bitboard, 64> generate_pawn_attacks_table() {
     return generate_non_sliding_attacks_table(pawnMoves);
 }
 
-constexpr inline std::array<Bitboard, 64> kKnightAttacksTable = generate_knight_attacks_table();
-constexpr inline std::array<Bitboard, 64> kKingAttacksTable = generate_king_attacks_table();
-constexpr inline std::array<std::array<Bitboard, 64>, 2> kPawnAttacksTable = {
+inline constexpr std::array<Bitboard, 64> kKnightAttacksTable = generate_knight_attacks_table();
+inline constexpr std::array<Bitboard, 64> kKingAttacksTable = generate_king_attacks_table();
+inline constexpr std::array<std::array<Bitboard, 64>, 2> kPawnAttacksTable = {
     generate_pawn_attacks_table<Color::White>(), generate_pawn_attacks_table<Color::Black>()
 };

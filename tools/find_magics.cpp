@@ -88,7 +88,7 @@ std::array<Magic, 64> find_magics(PieceType pieceType) {
 std::string magics_to_string(std::string_view name, const std::array<Magic, 64>& arr) {
     std::string out{};
 
-    out += std::format("constexpr inline std::array<Magic, 64> {} = {{{{\n", name);
+    out += std::format("inline constexpr std::array<Magic, 64> {} = {{{{\n", name);
 
     for (size_t i = 0; i < 64; ++i) {
         const Magic& m = arr[i];

@@ -8,7 +8,7 @@ struct MoveList;
 struct PinsInfo;
 
 // Checks if a piece of the given type can move in the given direction
-constexpr inline bool is_slider_for_direction(PieceType pt, Direction dir) noexcept {
+constexpr bool is_slider_for_direction(PieceType pt, Direction dir) noexcept {
     switch (dir) {
         case Direction::North:
         case Direction::South:

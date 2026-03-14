@@ -4,14 +4,14 @@
 namespace geom {
 
 // clang-format off
-constexpr inline std::array<Direction, 8> kDirections = {
+inline constexpr std::array<Direction, 8> kDirections = {
     Direction::North, Direction::South, Direction::East, Direction::West,
     Direction::NorthEast, Direction::NorthWest, Direction::SouthEast, Direction::SouthWest
 };
 // clang-format on
 
 // Map Direction to an index from 0-7 for table lookups
-constexpr inline size_t direction_index(Direction dir) noexcept {
+constexpr size_t direction_index(Direction dir) noexcept {
     switch (dir) {
         case Direction::North:
             return 0;
@@ -33,7 +33,7 @@ constexpr inline size_t direction_index(Direction dir) noexcept {
             return 8;  // Invalid direction index
     }
 }
-constexpr inline std::array<std::array<Square, 8>, 64> make_step_table() noexcept {
+constexpr std::array<std::array<Square, 8>, 64> make_step_table() noexcept {
     std::array<std::array<Square, 8>, 64> stepTable{};
 
     constexpr auto step_in_direction = [](Square sq, Direction dir) noexcept {
@@ -63,9 +63,9 @@ constexpr inline std::array<std::array<Square, 8>, 64> make_step_table() noexcep
     return stepTable;
 }
 
-constexpr inline std::array<std::array<Square, 8>, 64> kStepTable = make_step_table();
+inline constexpr std::array<std::array<Square, 8>, 64> kStepTable = make_step_table();
 // Steps from the given square in the given direction, or returns Square::None if stepping goes off the board.
-constexpr inline Square step(Square sq, Direction dir) noexcept {
+constexpr Square step(Square sq, Direction dir) noexcept {
     return kStepTable[to_underlying(sq)][direction_index(dir)];
 }
 

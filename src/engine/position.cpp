@@ -368,6 +368,10 @@ void Position::movePiece_(Square from, Square to) noexcept {
     putPiece_(to, piece);
 }
 
+bool Position::inCheck() const noexcept {
+    return is_square_attacked(*this, kingSquare(sideToMove_), ~sideToMove_);
+}
+
 Key Position::computeHash() const noexcept {
     Key h = 0;
     for (size_t s = 0; s < 64; ++s) {

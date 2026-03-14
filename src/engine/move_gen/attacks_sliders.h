@@ -11,11 +11,11 @@ const size_t kBishopStride = 512;
 inline std::array<Bitboard, 64 * kRookStride> kRookAttacksTable;
 inline std::array<Bitboard, 64 * kBishopStride> kBishopAttacksTable;
 
-constexpr inline size_t magic_index(const Magic& magic, Bitboard blockers) noexcept {
+constexpr size_t magic_index(const Magic& magic, Bitboard blockers) noexcept {
     return static_cast<size_t>(((blockers & magic.mask) * magic.magic) >> magic.shift);
 }
 
-constexpr inline Bitboard rook_mask(Square sq) noexcept {
+constexpr Bitboard rook_mask(Square sq) noexcept {
     Bitboard mask = 0;
     const int curFile = to_underlying(file(sq));
     const int curRank = to_underlying(rank(sq));
@@ -37,7 +37,7 @@ constexpr inline Bitboard rook_mask(Square sq) noexcept {
     return mask;
 }
 
-constexpr inline Bitboard bishop_mask(Square sq) noexcept {
+constexpr Bitboard bishop_mask(Square sq) noexcept {
     Bitboard mask = 0;
     const int curFile = to_underlying(file(sq));
     const int curRank = to_underlying(rank(sq));
@@ -62,7 +62,7 @@ constexpr inline Bitboard bishop_mask(Square sq) noexcept {
 // These functions compute the sliding attacks for rooks and bishops given a square and blocker configuration
 // by simulating rays in each direction until a blocker is hit.
 
-constexpr inline Bitboard rook_attacks_ray(Square sq, Bitboard occupancy) noexcept {
+constexpr Bitboard rook_attacks_ray(Square sq, Bitboard occupancy) noexcept {
     Bitboard attacks = 0;
     const int curFile = to_underlying(file(sq));
     const int curRank = to_underlying(rank(sq));
@@ -99,7 +99,7 @@ constexpr inline Bitboard rook_attacks_ray(Square sq, Bitboard occupancy) noexce
     return attacks;
 }
 
-constexpr inline Bitboard bishop_attacks_ray(Square sq, Bitboard occupancy) noexcept {
+constexpr Bitboard bishop_attacks_ray(Square sq, Bitboard occupancy) noexcept {
     Bitboard attacks = 0;
     const int curFile = to_underlying(file(sq));
     const int curRank = to_underlying(rank(sq));
@@ -136,7 +136,7 @@ constexpr inline Bitboard bishop_attacks_ray(Square sq, Bitboard occupancy) noex
     return attacks;
 }
 
-constexpr inline Bitboard index_to_occupancy(Bitboard magic_mask, size_t magic_index) noexcept {
+constexpr Bitboard index_to_occupancy(Bitboard magic_mask, size_t magic_index) noexcept {
     Bitboard occ = 0;
     while (magic_mask) {
         const Bitboard lsb = magic_mask & (~magic_mask + 1);
@@ -151,7 +151,7 @@ constexpr inline Bitboard index_to_occupancy(Bitboard magic_mask, size_t magic_i
 // Initializes the rook and bishop attack tables by iterating over all squares and all blocker configurations
 // Must occur at startup before move generation is used
 
-constexpr inline void init_rook_attacks_table() noexcept {
+constexpr void init_rook_attacks_table() noexcept {
     for (size_t i = 0; i < 64; ++i) {
         const auto sq = static_cast<Square>(i);
         const Magic magic = kRookMagics[i];
@@ -165,7 +165,7 @@ constexpr inline void init_rook_attacks_table() noexcept {
     }
 }
 
-constexpr inline void init_bishop_attacks_table() noexcept {
+constexpr void init_bishop_attacks_table() noexcept {
     for (size_t i = 0; i < 64; ++i) {
         const auto sq = static_cast<Square>(i);
         const Magic magic = kBishopMagics[i];
