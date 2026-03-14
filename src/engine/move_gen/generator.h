@@ -7,6 +7,14 @@
 struct MoveList;
 struct PinsInfo;
 
+enum class GenMode : uint8_t {
+    Legal,     // All legal moves, including quiet moves
+    Tactical,  // Captures, promotions, and king moves, but not quiet moves
+    Evasions,  // Moves to get out of check (captures, king moves, and blocking moves)
+
+    Count = 3
+};
+
 // Checks if a piece of the given type can move in the given direction
 constexpr bool is_slider_for_direction(PieceType pt, Direction dir) noexcept {
     switch (dir) {
@@ -38,14 +46,15 @@ bool is_any_square_attacked(const Position& pos, Bitboard b, Color by) noexcept;
 // Computes pinned pieces and their corresponding pin rays for the given position and side to move.
 PinsInfo compute_pins(const Position& pos, Color us) noexcept;
 // Generates all legal moves for the given position and appends them to the move list.
-void generate_moves(const Position& pos, MoveList& moveList) noexcept;
+void generate_moves(const Position& pos, MoveList& moveList, GenMode mode = GenMode::Legal) noexcept;
 
 // List of moves, with a max size of 256 (max moves in any given position is known to be 218)
 struct MoveList {
     MoveList() noexcept = default;
-    explicit MoveList(const Position& pos) noexcept { generate_moves(pos, *this); }
+    explicit MoveList(const Position& pos, GenMode mode = GenMode::Legal) noexcept { generate_moves(pos, *this, mode); }
     constexpr void clear() noexcept { size_ = 0; }
     constexpr uint8_t size() const noexcept { return size_; }
+    constexpr bool empty() const noexcept { return size_ == 0; }
     constexpr void push_back(Move m) noexcept { data_[size_++] = m; }
     constexpr Move operator[](int i) const noexcept { return data_[i]; }
     constexpr Move& operator[](int i) noexcept { return data_[i]; }

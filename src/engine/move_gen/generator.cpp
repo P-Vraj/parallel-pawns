@@ -2,6 +2,10 @@
 
 namespace {
 
+constexpr bool includes_quiets(GenMode mode) noexcept {
+    return mode == GenMode::Legal || mode == GenMode::Evasions;
+}
+
 void push_simple_moves(Square from, Bitboard targets, Bitboard themOcc, MoveList& moveList) noexcept {
     while (targets) {
         const auto to = static_cast<Square>(pop_lsb(targets));
@@ -67,8 +71,10 @@ State init_state(const Position& pos) noexcept {
     return state;
 }
 
-void generate_king_moves(const Position& pos, const State& state, MoveList& moveList) noexcept {
+void generate_king_moves(const Position& pos, const State& state, MoveList& moveList, GenMode mode) noexcept {
     Bitboard targets = attacks::king_attacks(state.kingSq) & ~state.usOcc;
+    if (mode == GenMode::Tactical)
+        targets &= state.themOcc;
     while (targets) {
         const auto to = static_cast<Square>(pop_lsb(targets));
         // Build occupancy after king moves (remove king, capture if enemy present, place king)
@@ -86,13 +92,15 @@ void generate_king_moves(const Position& pos, const State& state, MoveList& move
 }
 
 template <PieceType PT>
-void generate_piece_moves(const Position& pos, const State& state, MoveList& moveList) {
+void generate_piece_moves(const Position& pos, const State& state, MoveList& moveList, GenMode mode) {
     Bitboard pieces = pos.get(state.us, PT);
     while (pieces) {
         const auto from = static_cast<Square>(pop_lsb(pieces));
         Bitboard targets = attacks::piece_attacks<PT>(from, state.occ) & ~state.usOcc;
 
         targets &= state.pins.pinRay[to_underlying(from)] & state.evasionMask;
+        if (mode == GenMode::Tactical)
+            targets &= state.themOcc;
 
         push_simple_moves(from, targets, state.themOcc, moveList);
     }
@@ -122,8 +130,9 @@ void push_pawn_attacks(
     }
 }
 
-void generate_pawn_moves(const Position& pos, const State& state, MoveList& moveList) noexcept {
+void generate_pawn_moves(const Position& pos, const State& state, MoveList& moveList, GenMode mode) noexcept {
     const Bitboard pawns = pos.get(state.us, PieceType::Pawn);
+    const Bitboard promotionMask = (state.us == Color::White) ? bitboard(Rank::R8) : bitboard(Rank::R1);
     // Captures
     {
         Bitboard p = pawns;
@@ -135,7 +144,7 @@ void generate_pawn_moves(const Position& pos, const State& state, MoveList& move
         }
     }
     // Pushes
-    {
+    if (includes_quiets(mode)) {
         Bitboard p = pawns;
         while (p) {
             // Single push
@@ -161,10 +170,24 @@ void generate_pawn_moves(const Position& pos, const State& state, MoveList& move
             push_pawn_attacks(from, doubleTargets, state.themOcc, state.us, MoveType::PawnDoubleStep, moveList);
         }
     }
+    else {
+        Bitboard p = pawns;
+        while (p) {
+            const auto from = static_cast<Square>(pop_lsb(p));
+            const Bitboard filter = state.pins.pinRay[to_underlying(from)] & state.evasionMask;
+            const Direction dir = (state.us == Color::White) ? Direction::North : Direction::South;
+            const Square singlePushTo = geom::step(from, dir);
+            if (!is_valid(singlePushTo) || (state.occ & bitboard(singlePushTo)) != 0)
+                continue;
+
+            const Bitboard promoTargets = bitboard(singlePushTo) & filter & promotionMask;
+            push_pawn_attacks(from, promoTargets, state.themOcc, state.us, MoveType::Normal, moveList);
+        }
+    }
 }
 
-void generate_castling_moves(const Position& pos, const State& state, MoveList& moveList) noexcept {
-    if (state.numCheckers > 0)
+void generate_castling_moves(const Position& pos, const State& state, MoveList& moveList, GenMode mode) noexcept {
+    if (mode != GenMode::Legal || state.numCheckers > 0)
         return;
 
     const CastlingRights mask = (state.us == Color::White)
@@ -216,7 +239,8 @@ void generate_castling_moves(const Position& pos, const State& state, MoveList& 
     }
 }
 
-void generate_en_passant_moves(const Position& pos, const State& state, MoveList& moveList) noexcept {
+void generate_en_passant_moves(const Position& pos, const State& state, MoveList& moveList, GenMode mode) noexcept {
+    (void)mode;
     const Square epSq = pos.epSquare();
     if (!is_valid(epSq))
         return;
@@ -315,22 +339,23 @@ PinsInfo compute_pins(const Position& pos, Color us) noexcept {
     return pins;
 }
 
-void generate_moves(const Position& pos, MoveList& moveList) noexcept {
+void generate_moves(const Position& pos, MoveList& moveList, GenMode mode) noexcept {
     moveList.clear();
     const State state = init_state(pos);
+    const GenMode effectiveMode = (state.numCheckers > 0 && mode == GenMode::Tactical) ? GenMode::Evasions : mode;
 
-    generate_king_moves(pos, state, moveList);
+    generate_king_moves(pos, state, moveList, effectiveMode);
     // Only king moves possible in double check
     if (state.numCheckers >= 2)
         return;
 
-    generate_piece_moves<PieceType::Knight>(pos, state, moveList);
-    generate_piece_moves<PieceType::Bishop>(pos, state, moveList);
-    generate_piece_moves<PieceType::Rook>(pos, state, moveList);
-    generate_piece_moves<PieceType::Queen>(pos, state, moveList);
+    generate_piece_moves<PieceType::Knight>(pos, state, moveList, effectiveMode);
+    generate_piece_moves<PieceType::Bishop>(pos, state, moveList, effectiveMode);
+    generate_piece_moves<PieceType::Rook>(pos, state, moveList, effectiveMode);
+    generate_piece_moves<PieceType::Queen>(pos, state, moveList, effectiveMode);
 
-    generate_pawn_moves(pos, state, moveList);
+    generate_pawn_moves(pos, state, moveList, effectiveMode);
 
-    generate_castling_moves(pos, state, moveList);
-    generate_en_passant_moves(pos, state, moveList);
+    generate_castling_moves(pos, state, moveList, effectiveMode);
+    generate_en_passant_moves(pos, state, moveList, effectiveMode);
 }

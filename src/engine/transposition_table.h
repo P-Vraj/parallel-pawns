@@ -36,23 +36,30 @@ public:
         resize(sizeMB);
     }
     void resize(size_t sizeMB) noexcept {
-        const size_t bytes = sizeMB * 1024 * 1024;
-        size_ = bytes / sizeof(TTEntry);
+        size_ = sizeMB * 1024 * 1024 / sizeof(TTEntry);
         table_.resize(size_);
         clear();
     }
     size_t size() const noexcept { return size_; }
-    bool empty() const noexcept { return table_.empty(); }
-    void clear() noexcept { std::ranges::fill(table_.begin(), table_.end(), TTEntry{}); }
+    bool empty() const noexcept { return size_ == 0; }
+    void clear() noexcept {
+        std::ranges::fill(table_.begin(), table_.end(), TTEntry{});
+        resetCounters();
+    }
     void newSearch() noexcept { ++age_; }
     const TTEntry* probe(Key key) const noexcept {
-        if (empty())
+        if (empty()) {
+            ++misses_;
             return nullptr;
+        }
 
         const TTEntry& entry = table_[index_(key)];
-        if (entry.hash != key)
+        if (entry.hash != key) {
+            ++misses_;
             return nullptr;
+        }
 
+        ++hits_;
         return &entry;
     }
     void store(Key key, Move move, Eval score, uint8_t depth, Bound bound, int ply) noexcept {
@@ -69,10 +76,23 @@ public:
         entry = TTEntry{ key, score, move, bound, depth, age_ };
     }
 
+    size_t hits() const noexcept { return hits_; }
+    size_t misses() const noexcept { return misses_; }
+    float hitRate() const noexcept {
+        const size_t total = hits_ + misses_;
+        return (total > 0) ? static_cast<float>(hits_) / total : 0.0f;
+    }
+    void resetCounters() noexcept {
+        hits_ = 0;
+        misses_ = 0;
+    }
+
 private:
     size_t index_(Key key) const noexcept { return key & (size_ - 1); }
 
     std::vector<TTEntry> table_;
     size_t size_{};
     uint8_t age_{};
+    mutable size_t hits_{};
+    mutable size_t misses_{};
 };
