@@ -228,6 +228,10 @@ enum class PieceType : uint8_t {
     Count = 7
 };
 
+constexpr bool is_empty(PieceType pt) noexcept {
+    return pt == PieceType::None;
+}
+
 constexpr PieceType& operator++(PieceType& pt) noexcept {
     pt = static_cast<PieceType>(to_underlying(pt) + 1);
     return pt;
@@ -343,6 +347,7 @@ struct Move {
     constexpr Square to() const noexcept { return static_cast<Square>((data_ >> 6) & 63); }
     constexpr MoveType moveType() const noexcept { return static_cast<MoveType>(data_ >> 12); }
     static constexpr Move none() noexcept { return Move{}; }
+    constexpr bool isNone() const noexcept { return data_ == 0; }
     constexpr bool isNormal() const noexcept { return (data_ >> 12) == to_underlying(MoveType::Normal); }
     constexpr bool isCapture() const noexcept { return data_ & (0b1000 << 12); }
     constexpr bool isPromotion() const noexcept { return data_ & (0b0100 << 12); }

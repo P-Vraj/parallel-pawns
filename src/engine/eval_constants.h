@@ -21,6 +21,9 @@ constexpr bool isWinningMate(Eval score) noexcept {
 constexpr bool isLosingMate(Eval score) noexcept {
     return score < -kMateThreshold;
 }
+constexpr Eval matedScore(int ply) noexcept {
+    return -kMateScore + ply;
+}
 constexpr Eval encodeMateScore(Eval score, int ply) noexcept {
     if (isWinningMate(score))
         return static_cast<Eval>(score + ply);
