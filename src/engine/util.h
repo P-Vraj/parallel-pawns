@@ -7,7 +7,7 @@
 #include "position.h"
 #include "types.h"
 
-inline char to_char(PieceType pt) {
+constexpr char to_char(PieceType pt) {
     switch (pt) {
         case PieceType::Pawn:
             return 'p';
@@ -142,28 +142,28 @@ constexpr Square to_square(std::string_view str) {
     return make_square(f, r);
 }
 
-constexpr inline void set_bit(Bitboard& b, Square sq) noexcept {
+constexpr void set_bit(Bitboard& b, Square sq) noexcept {
     b |= bitboard(sq);
 }
 
-constexpr inline void clear_bit(Bitboard& b, Square sq) noexcept {
+constexpr void clear_bit(Bitboard& b, Square sq) noexcept {
     b &= ~bitboard(sq);
 }
 
-constexpr inline bool get_bit(Bitboard b, Square sq) noexcept {
+constexpr bool get_bit(Bitboard b, Square sq) noexcept {
     return b & bitboard(sq);
 }
 
-constexpr inline int get_lsb(Bitboard b) noexcept {
+constexpr int get_lsb(Bitboard b) noexcept {
     return __builtin_ctzll(b);
 }
 
-constexpr inline int pop_lsb(Bitboard& b) noexcept {
+constexpr int pop_lsb(Bitboard& b) noexcept {
     const int lsbIndex = get_lsb(b);
     b &= b - 1;
     return lsbIndex;
 }
 
-constexpr inline int bit_count(Bitboard b) noexcept {
+constexpr int bit_count(Bitboard b) noexcept {
     return __builtin_popcountll(b);
 }

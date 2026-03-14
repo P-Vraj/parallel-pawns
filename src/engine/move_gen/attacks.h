@@ -41,7 +41,7 @@ inline Bitboard pawn_attacks(Color c, Square sq) noexcept {
 // Returns a bitboard of squares attacked by a piece of the given type for the square and (optional) occupancy.
 template <PieceType PT>
     requires(PT == PieceType::Knight || PT == PieceType::Bishop || PT == PieceType::Rook || PT == PieceType::Queen)
-inline constexpr Bitboard piece_attacks(Square sq, Bitboard occ) noexcept {
+constexpr Bitboard piece_attacks(Square sq, Bitboard occ) noexcept {
     if constexpr (PT == PieceType::Knight)
         return knight_attacks(sq);
     if constexpr (PT == PieceType::Bishop)

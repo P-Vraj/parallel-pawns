@@ -43,6 +43,7 @@ struct Position {
     void makeMove(Move m, UndoInfo& undo) noexcept;
     // Undoes the given move using the provided undo information, restoring the position to its previous state.
     void undoMove(Move m, const UndoInfo& undo) noexcept;
+    bool inCheck() const noexcept;
     // Computes the Zobrist hash of the position. Only needed at initialization, as the hash is updated incrementally.
     Key computeHash() const noexcept;
 
