@@ -35,9 +35,9 @@ inline std::string to_string(Color c) {
 inline std::string to_string(Piece p) {
     const char pt = to_char(piece_type(p));
     if (color(p) == Color::White) {
-        return std::string{ static_cast<char>(toupper(pt)) };
+        return std::string{static_cast<char>(toupper(pt))};
     }
-    return std::string{ pt };
+    return std::string{pt};
 }
 
 inline std::string to_string(Square sq) {
@@ -46,7 +46,7 @@ inline std::string to_string(Square sq) {
     }
     const char f = static_cast<char>('a' + to_underlying(file(sq)));
     const char r = static_cast<char>('1' + to_underlying(rank(sq)));
-    return std::string{ f, r };
+    return std::string{f, r};
 }
 
 inline std::string to_string(CastlingRights cr) {
@@ -67,7 +67,7 @@ inline std::string to_string(CastlingRights cr) {
 
 // Long algebraic notation format
 inline std::string to_string(Move m) {
-    const std::string promo = m.isPromotion() ? std::string{ to_char(m.promotionType()) } : "";
+    const std::string promo = m.isPromotion() ? std::string{to_char(m.promotionType())} : "";
     return to_string(m.from()) + to_string(m.to()) + promo;
 }
 
@@ -80,7 +80,7 @@ inline std::string to_string(Bitboard b) {
             const Square sq = make_square(static_cast<File>(f), static_cast<Rank>(r));
             out += (b & bitboard(sq)) ? "| * " : "|   ";
         }
-        out += "| " + std::string{ static_cast<char>('1' + r) };
+        out += "| " + std::string{static_cast<char>('1' + r)};
         out += "\n" + divider + "\n";
     }
 
@@ -98,7 +98,7 @@ inline std::string to_string(const Position& pos) {
             const Piece p = pos.pieceOn(sq);
             out += "| " + to_string(p) + " ";
         }
-        out += "| " + std::string{ static_cast<char>('1' + r) };
+        out += "| " + std::string{static_cast<char>('1' + r)};
         out += "\n" + divider + "\n";
     }
 

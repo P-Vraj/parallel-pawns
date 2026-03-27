@@ -136,7 +136,7 @@ inline Eval material_diff(const Position& pos) noexcept {
 inline Eval piece_square_diff(const Position& pos) noexcept {
     int score = 0;
 
-    for (const Color c : { Color::White, Color::Black }) {
+    for (const Color c : {Color::White, Color::Black}) {
         const int sign = (c == Color::White) ? 1 : -1;
 
         for (PieceType pt = PieceType::Pawn; pt <= PieceType::King; ++pt) {
@@ -165,11 +165,11 @@ inline Eval mobility_diff(const Position& pos) noexcept {
     int score = 0;
     const Bitboard occ = pos.occupancy();
 
-    for (const Color c : { Color::White, Color::Black }) {
+    for (const Color c : {Color::White, Color::Black}) {
         const int sign = (c == Color::White) ? 1 : -1;
         const Bitboard usOcc = pos.occupancy(c);
 
-        for (const PieceType pt : { PieceType::Knight, PieceType::Bishop, PieceType::Rook, PieceType::Queen }) {
+        for (const PieceType pt : {PieceType::Knight, PieceType::Bishop, PieceType::Rook, PieceType::Queen}) {
             Bitboard pieces = pos.get(c, pt);
             while (pieces) {
                 const auto sq = static_cast<Square>(pop_lsb(pieces));

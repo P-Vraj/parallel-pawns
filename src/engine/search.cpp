@@ -252,7 +252,7 @@ bool Search::isTerminal_(const Position& pos, const MoveList& moves, int ply, Ev
 
 void Search::resetHeuristics_() noexcept {
     for (auto& plyKillers : killers_) {
-        plyKillers = { Move::none(), Move::none() };
+        plyKillers = {Move::none(), Move::none()};
     }
 
     for (auto& colorHistory : history_) {

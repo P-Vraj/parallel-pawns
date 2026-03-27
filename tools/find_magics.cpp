@@ -29,7 +29,7 @@ Magic find_magic_for_square(
     std::vector<Bitboard> used(tableSize);
 
     while (true) {
-        Magic magic{ mask, sparse_rand64(rng), static_cast<uint8_t>(64 - relevantBits) };
+        Magic magic{mask, sparse_rand64(rng), static_cast<uint8_t>(64 - relevantBits)};
 
         std::ranges::fill(used.begin(), used.end(), 0ULL);
 
@@ -94,8 +94,12 @@ std::string magics_to_string(std::string_view name, const std::array<Magic, 64>&
         const Magic& m = arr[i];
 
         out += std::format(
-            "    {{ 0x{:016x}, 0x{:016x}, {} }}{}{}\n", static_cast<uint64_t>(m.mask), m.magic,
-            static_cast<unsigned>(m.shift), (i == 63 ? "" : ","), ""
+            "    {{ 0x{:016x}, 0x{:016x}, {} }}{}{}\n",
+            static_cast<uint64_t>(m.mask),
+            m.magic,
+            static_cast<unsigned>(m.shift),
+            (i == 63 ? "" : ","),
+            ""
         );
     }
 
@@ -124,7 +128,8 @@ int main() {
         out += magics_to_string("kRookMagics", rookMagics) + "\n";
         out += magics_to_string("kBishopMagics", bishopMagics);
         std::cout << out;
-    } catch (const std::exception& e) {
+    }
+    catch (const std::exception& e) {
         std::cerr << "Error finding magics: " << e.what() << "\n";
         return EXIT_FAILURE;
     }

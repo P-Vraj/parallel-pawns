@@ -78,7 +78,7 @@ public:
             return;
 
         score = pack_TTScore(encode_mate_score(score, ply));
-        entry = TTEntry{ key, score, move, bound, depth, age_ };
+        entry = TTEntry{key, score, move, bound, depth, age_};
     }
 
     // Statistics

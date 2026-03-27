@@ -37,9 +37,9 @@ private:
 
     std::vector<UCIOption> options_;
     Position position_{};
-    TranspositionTable tt_{ static_cast<size_t>(kDefaultHashMb) };
-    SearchLimits searchLimits_{ static_cast<uint8_t>(kDefaultDepth) };
-    Search search_{ &tt_ };
+    TranspositionTable tt_{static_cast<size_t>(kDefaultHashMb)};
+    SearchLimits searchLimits_{static_cast<uint8_t>(kDefaultDepth)};
+    Search search_{&tt_};
 
     void setOption_(std::string name, std::string value);
     const UCIOption& option_(std::string_view name) const;

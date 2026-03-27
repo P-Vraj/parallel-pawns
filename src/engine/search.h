@@ -15,7 +15,7 @@ constexpr Eval absolute_eval(Eval score, Color sideToMove) noexcept {
 }
 
 struct SearchLimits {
-    Depth depth{ 1 };
+    Depth depth{1};
 };
 
 struct SearchResult {
@@ -47,7 +47,7 @@ private:
     static int scoreQEvasion_(const Position& pos, Move move) noexcept;
     static void orderQMoves_(const Position& pos, MoveList& moves, bool inCheck) noexcept;
 
-    TranspositionTable* tt_{ nullptr };
+    TranspositionTable* tt_{nullptr};
     uint64_t nodes_{};
     uint64_t qNodes_{};
     std::array<std::array<Move, 2>, kMaxPly> killers_{};

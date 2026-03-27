@@ -66,7 +66,7 @@ State init_state(const Position& pos) noexcept {
     state.checkers = checkers(pos, state.us);
     state.numCheckers = bit_count(state.checkers);
     state.pins = compute_pins(pos, state.us);
-    state.evasionMask = (state.numCheckers == 1) ? evasion_mask(pos, state.kingSq, state.checkers) : ~Bitboard{ 0 };
+    state.evasionMask = (state.numCheckers == 1) ? evasion_mask(pos, state.kingSq, state.checkers) : ~Bitboard{0};
 
     return state;
 }
@@ -304,7 +304,7 @@ bool is_any_square_attacked(const Position& pos, Bitboard b, Color by) noexcept 
 
 PinsInfo compute_pins(const Position& pos, Color us) noexcept {
     PinsInfo pins;
-    pins.pinRay.fill(~Bitboard{ 0 });
+    pins.pinRay.fill(~Bitboard{0});
 
     const Square kingSq = pos.kingSquare(us);
 

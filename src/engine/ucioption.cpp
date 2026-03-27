@@ -6,34 +6,40 @@
 #include "util.h"
 
 UCIOption UCIOption::check(std::string name, bool defaultValue) {
-    return UCIOption{ .name = name,
-                      .key = normalized_option_key(name),
-                      .type = OptionType::Check,
-                      .value = defaultValue,
-                      .min = std::nullopt,
-                      .max = std::nullopt };
+    return UCIOption{
+        .name = name,
+        .key = normalized_option_key(name),
+        .type = OptionType::Check,
+        .value = defaultValue,
+        .min = std::nullopt,
+        .max = std::nullopt
+    };
 }
 
 UCIOption UCIOption::spin(std::string name, int defaultValue, int minValue, int maxValue) {
-    return UCIOption{ .name = name,
-                      .key = normalized_option_key(name),
-                      .type = OptionType::Spin,
-                      .value = defaultValue,
-                      .min = minValue,
-                      .max = maxValue };
+    return UCIOption{
+        .name = name,
+        .key = normalized_option_key(name),
+        .type = OptionType::Spin,
+        .value = defaultValue,
+        .min = minValue,
+        .max = maxValue
+    };
 }
 
 UCIOption UCIOption::string(std::string name, std::string defaultValue) {
-    return UCIOption{ .name = name,
-                      .key = normalized_option_key(name),
-                      .type = OptionType::String,
-                      .value = std::move(defaultValue),
-                      .min = std::nullopt,
-                      .max = std::nullopt };
+    return UCIOption{
+        .name = name,
+        .key = normalized_option_key(name),
+        .type = OptionType::String,
+        .value = std::move(defaultValue),
+        .min = std::nullopt,
+        .max = std::nullopt
+    };
 }
 
 std::string UCIOption::uciDeclaration() const {
-    std::string out{ std::format("option name {}", name) };
+    std::string out{std::format("option name {}", name)};
     switch (type) {
         case OptionType::Check:
             out += std::format(" type check default {}", to_string(value));

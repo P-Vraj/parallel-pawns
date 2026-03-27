@@ -37,7 +37,7 @@ Position Position::fromFEN(std::string_view fen) {
     pos.parsePieceMap_(fields[0]);
     pos.fillBitboards_();
 
-    for (const Color c : { Color::White, Color::Black }) {
+    for (const Color c : {Color::White, Color::Black}) {
         pos.kingSquare_[to_underlying(c)] = static_cast<Square>(get_lsb(pos.get(c, PieceType::King)));
     }
 

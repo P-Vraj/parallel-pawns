@@ -10,9 +10,11 @@
 namespace engine {
 
 Engine::Engine() {
-    options_ = { UCIOption::spin("Hash", kDefaultHashMb, 1, 65536),
-                 UCIOption::spin("Default Depth", kDefaultDepth, 1, 255),
-                 UCIOption::spin("Threads", kDefaultThreads, 1, 1024) };
+    options_ = {
+        UCIOption::spin("Hash", kDefaultHashMb, 1, 65536),
+        UCIOption::spin("Default Depth", kDefaultDepth, 1, 255),
+        UCIOption::spin("Threads", kDefaultThreads, 1, 1024)
+    };
     init_engine();
 }
 

@@ -55,7 +55,9 @@ void UCIEngine::loop() {
             std::cout << "id name Parfait\n";
             std::cout << "id author Parallel Pawns\n\n";
 
-            for (const auto& option : engine_.options_) std::cout << option.uciDeclaration() << '\n';
+            for (const auto& option : engine_.options_) {
+                std::cout << option.uciDeclaration() << '\n';
+            }
 
             std::cout << "\nuciok\n";
         }
@@ -74,40 +76,29 @@ void UCIEngine::loop() {
             engine_.setPosition_(startpos);
         }
         else if (command == "position") {
-            std::string token, fen;
-            iss >> token;
-            if (token == "startpos") {
-                fen = std::string(startpos);
-            }
-            else if (token == "fen") {
-                std::string fenPart;
-                for (int i = 0; i < 6 && iss >> fenPart; ++i) {
-                    if (!fen.empty())
-                        fen += " ";
-                    fen += fenPart;
-                }
+            std::string fen{startpos};
+            size_t fenIt = line.find("fen");
+            size_t movesIt = line.find("moves");
+            if (fenIt != std::string::npos) {
+                fen = line.substr(fenIt + 4, movesIt - fenIt - 4);
                 trim(fen);
-                iss >> token;  // Check if there are moves after the FEN
-            }
-            else {
-                std::cout << "Invalid position command: " << line << '\n';
-                continue;
             }
             engine_.setPosition_(fen);
-            if (token == "moves") {
-                // Can be refactored
-                std::string uciMove;
-                while (iss >> uciMove) {
-                    MoveList moves(engine_.position_);
-                    auto* it = std::ranges::find_if(moves, [&](Move m) { return to_string(m) == uciMove; });
-                    if (it != moves.end()) {
-                        UndoInfo u{};
-                        engine_.position_.makeMove(*it, u);
-                    }
-                    else {
-                        std::cout << "Invalid move in position command: " << uciMove << '\n';
-                        continue;
-                    }
+
+            if (movesIt == std::string::npos)
+                continue;
+            iss.seekg(movesIt + 6);
+
+            for (std::string uciMove; iss >> uciMove;) {
+                MoveList moveList(engine_.position_);
+                auto* it = std::ranges::find_if(moveList, [&](Move m) { return to_string(m) == uciMove; });
+                if (it != moveList.end()) {
+                    UndoInfo u{};
+                    engine_.position_.makeMove(*it, u);
+                }
+                else {
+                    std::cout << "Invalid move in position command: " << uciMove << '\n';
+                    continue;
                 }
             }
         }

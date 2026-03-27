@@ -15,9 +15,9 @@ AllowShortEnumsOnASingleLine: true
 
 AlignAfterOpenBracket: BlockIndent
 AllowAllParametersOfDeclarationOnNextLine: false
-BinPackArguments: true
+BinPackArguments: false
 BinPackParameters: false
-Cpp11BracedListStyle: false
+Cpp11BracedListStyle: true
 
 AllowAllArgumentsOnNextLine: true
 ContinuationIndentWidth: 4
@@ -26,6 +26,7 @@ BreakBeforeBraces: Custom
 BraceWrapping:
   AfterControlStatement: false
   BeforeElse: true
+  BeforeCatch: true
 
 AlignConsecutiveAssignments: false
 AlignConsecutiveDeclarations: false
