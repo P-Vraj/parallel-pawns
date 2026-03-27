@@ -16,13 +16,13 @@ inline constexpr std::array<int16_t, to_underlying(PieceType::Count)> kPieceValu
 };
 
 inline constexpr std::array<int, to_underlying(PieceType::Count)> kMobilityWeights = {
-    0,      // None
-    0,      // Pawn
-    4,      // Knight
-    4,      // Bishop
-    2,      // Rook
-    1,      // Queen
-    0,      // King
+    0,  // None
+    0,  // Pawn
+    4,  // Knight
+    4,  // Bishop
+    2,  // Rook
+    1,  // Queen
+    0,  // King
 };
 
 // clang-format off
@@ -142,7 +142,7 @@ inline Eval piece_square_diff(const Position& pos) noexcept {
         for (PieceType pt = PieceType::Pawn; pt <= PieceType::King; ++pt) {
             Bitboard pieces = pos.get(c, pt);
             while (pieces) {
-                const Square sq = static_cast<Square>(pop_lsb(pieces));
+                const auto sq = static_cast<Square>(pop_lsb(pieces));
                 score += sign * piece_square_bonus(pt, c, sq);
             }
         }
@@ -172,7 +172,7 @@ inline Eval mobility_diff(const Position& pos) noexcept {
         for (const PieceType pt : { PieceType::Knight, PieceType::Bishop, PieceType::Rook, PieceType::Queen }) {
             Bitboard pieces = pos.get(c, pt);
             while (pieces) {
-                const Square sq = static_cast<Square>(pop_lsb(pieces));
+                const auto sq = static_cast<Square>(pop_lsb(pieces));
                 const Bitboard attacks = attacks::piece_attacks(pt, sq, occ) & ~usOcc;
                 score += sign * (bit_count(attacks) * kMobilityWeights[to_underlying(pt)]);
             }

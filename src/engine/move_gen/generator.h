@@ -1,4 +1,6 @@
 #pragma once
+#include <algorithm>
+
 #include "../geometry.h"
 #include "../position.h"
 #include "../util.h"
@@ -62,6 +64,7 @@ struct MoveList {
     constexpr const Move* begin() const noexcept { return data_.data(); }
     constexpr Move* end() noexcept { return data_.data() + size_; }
     constexpr const Move* end() const noexcept { return data_.data() + size_; }
+    constexpr bool contains(Move m) const noexcept { return std::ranges::find(*this, m) != end(); }
 
 private:
     std::array<Move, 256> data_{};

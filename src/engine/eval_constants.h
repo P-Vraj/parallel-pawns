@@ -12,29 +12,39 @@ constexpr Eval kDrawScore = 0;
 
 constexpr int kMaxPly = 128;
 
-constexpr bool isMateScore(Eval score) noexcept {
+constexpr bool is_mate_score(Eval score) noexcept {
     return score > kMateThreshold || score < -kMateThreshold;
 }
-constexpr bool isWinningMate(Eval score) noexcept {
+constexpr bool is_winning_mate(Eval score) noexcept {
     return score > kMateThreshold;
 }
-constexpr bool isLosingMate(Eval score) noexcept {
+constexpr bool is_losing_mate(Eval score) noexcept {
     return score < -kMateThreshold;
 }
-constexpr Eval matedScore(int ply) noexcept {
+constexpr Eval mated_score(int ply) noexcept {
     return -kMateScore + ply;
 }
-constexpr Eval encodeMateScore(Eval score, int ply) noexcept {
-    if (isWinningMate(score))
-        return static_cast<Eval>(score + ply);
-    if (isLosingMate(score))
-        return static_cast<Eval>(score - ply);
+constexpr Eval encode_mate_score(Eval score, int ply) noexcept {
+    if (is_winning_mate(score))
+        return score + ply;
+    if (is_losing_mate(score))
+        return score - ply;
     return score;
 }
-constexpr Eval decodeMateScore(Eval score, int ply) noexcept {
-    if (isWinningMate(score))
-        return static_cast<Eval>(score - ply);
-    if (isLosingMate(score))
-        return static_cast<Eval>(score + ply);
+constexpr Eval decode_mate_score(Eval score, int ply) noexcept {
+    if (is_winning_mate(score))
+        return score - ply;
+    if (is_losing_mate(score))
+        return score + ply;
     return score;
+}
+constexpr TTScore pack_TTScore(Eval score) noexcept {
+    if (score < std::numeric_limits<TTScore>::min())
+        return std::numeric_limits<TTScore>::min();
+    if (score > std::numeric_limits<TTScore>::max())
+        return std::numeric_limits<TTScore>::max();
+    return static_cast<TTScore>(score);
+}
+constexpr Eval unpack_TTScore(TTScore score) noexcept {
+    return static_cast<Eval>(score);
 }

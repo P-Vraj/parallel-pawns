@@ -14,14 +14,11 @@ Eval qsearch_gain(const Position& pos, Move move) noexcept {
         if (move.moveType() != MoveType::EnPassant)
             victim = piece_type(pos.pieceOn(move.to()));
 
-        gain = static_cast<Eval>(gain + kPieceValues[to_underlying(victim)]);
+        gain += kPieceValues[to_underlying(victim)];
     }
 
-    if (move.isPromotion()) {
-        gain = static_cast<Eval>(
-            gain + kPieceValues[to_underlying(move.promotionType())] - kPieceValues[to_underlying(PieceType::Pawn)]
-        );
-    }
+    if (move.isPromotion())
+        gain += kPieceValues[to_underlying(move.promotionType())] - kPieceValues[to_underlying(PieceType::Pawn)];
 
     return gain;
 }
@@ -86,8 +83,7 @@ SearchResult Search::search(Position& pos, const SearchLimits& limits) {
                 iterationBestMove = m;
             }
 
-            if (score > alpha)
-                alpha = score;
+            alpha = std::max(alpha, score);
         }
 
         bestMove = iterationBestMove;
@@ -101,20 +97,19 @@ SearchResult Search::search(Position& pos, const SearchLimits& limits) {
     return result;
 }
 
-Eval Search::alphaBeta_(Position& pos, int depth, Eval alpha, Eval beta, int ply) {
+Eval Search::alphaBeta_(Position& pos, Depth depth, Eval alpha, Eval beta, int ply) {
     ++nodes_;
 
     if (ply >= kMaxPly)
         return evaluate_(pos);
+    if (depth <= 0)
+        return quiescence_(pos, alpha, beta, ply);
 
     MoveList moves(pos);
 
     Eval terminalScore = 0;
     if (isTerminal_(pos, moves, ply, terminalScore))
         return terminalScore;
-
-    if (depth <= 0)
-        return quiescence_(pos, alpha, beta, ply);
 
     const Eval originalAlpha = alpha;
     const Key key = pos.hash();
@@ -124,9 +119,10 @@ Eval Search::alphaBeta_(Position& pos, int depth, Eval alpha, Eval beta, int ply
     if (tt_ != nullptr) {
         if (const TTEntry* entry = tt_->probe(key)) {
             ttMove = entry->bestMove;
-            const Eval ttScore = decodeMateScore(entry->score, ply);
+            const Eval ttScore = decode_mate_score(unpack_TTScore(entry->score), ply);
 
-            if (static_cast<int>(entry->depth) >= depth) {
+            const auto entryDepth = static_cast<Depth>(entry->depth);
+            if (entryDepth >= depth) {
                 switch (entry->bound) {
                     case Bound::Exact:
                         return ttScore;
@@ -164,8 +160,7 @@ Eval Search::alphaBeta_(Position& pos, int depth, Eval alpha, Eval beta, int ply
             bestMove = m;
         }
 
-        if (score > alpha)
-            alpha = score;
+        alpha = std::max(alpha, score);
 
         if (alpha >= beta) {
             if (!m.isCapture() && !m.isPromotion())
@@ -181,7 +176,7 @@ Eval Search::alphaBeta_(Position& pos, int depth, Eval alpha, Eval beta, int ply
         else if (bestScore >= beta)
             bound = Bound::Lower;
 
-        tt_->store(key, bestMove, bestScore, depth, bound, ply);
+        tt_->store(key, bestMove, pack_TTScore(bestScore), depth, bound, ply);
     }
 
     return bestScore;
@@ -207,15 +202,14 @@ Eval Search::quiescence_(Position& pos, Eval alpha, Eval beta, int ply) {
         if (standPat >= beta)
             return standPat;
 
-        if (standPat > alpha)
-            alpha = standPat;
+        alpha = std::max(alpha, standPat);
     }
 
     orderQMoves_(pos, moves, inCheck);
 
     for (const Move m : moves) {
         if (!inCheck) {
-            const Eval optimisticScore = static_cast<Eval>(standPat + qsearch_gain(pos, m) + kQSearchDeltaMargin);
+            const Eval optimisticScore = standPat + qsearch_gain(pos, m) + kQSearchDeltaMargin;
             if (optimisticScore < alpha)
                 continue;
 
@@ -233,24 +227,23 @@ Eval Search::quiescence_(Position& pos, Eval alpha, Eval beta, int ply) {
         if (score >= beta)
             return score;
 
-        if (score > alpha)
-            alpha = score;
+        alpha = std::max(alpha, score);
     }
 
     return alpha;
 }
 
-Eval Search::evaluate_(const Position& pos) const noexcept {
-    Eval score = evaluation(pos);
-    return (pos.sideToMove() == Color::White) ? score : static_cast<Eval>(-score);
+Eval Search::evaluate_(const Position& pos) noexcept {
+    const Eval score = evaluation(pos);
+    return (pos.sideToMove() == Color::White) ? score : -score;
 }
 
-bool Search::isTerminal_(const Position& pos, const MoveList& moves, int ply, Eval& terminalScore) const noexcept {
+bool Search::isTerminal_(const Position& pos, const MoveList& moves, int ply, Eval& terminalScore) noexcept {
     if (!moves.empty())
         return false;
 
     if (pos.inCheck())
-        terminalScore = matedScore(ply);
+        terminalScore = mated_score(ply);
     else
         terminalScore = kDrawScore;
 
@@ -258,15 +251,19 @@ bool Search::isTerminal_(const Position& pos, const MoveList& moves, int ply, Ev
 }
 
 void Search::resetHeuristics_() noexcept {
-    for (auto& plyKillers : killers_) plyKillers = { Move::none(), Move::none() };
+    for (auto& plyKillers : killers_) {
+        plyKillers = { Move::none(), Move::none() };
+    }
 
     for (auto& colorHistory : history_) {
-        for (auto& fromHistory : colorHistory) fromHistory.fill(0);
+        for (auto& fromHistory : colorHistory) {
+            fromHistory.fill(0);
+        }
     }
 }
 
 void Search::orderMoves_(const Position& pos, MoveList& moves, Move ttMove, int ply) const noexcept {
-    std::sort(moves.begin(), moves.end(), [&](Move lhs, Move rhs) {
+    std::ranges::sort(moves, [&](Move lhs, Move rhs) {
         return scoreMove_(pos, lhs, ttMove, ply) > scoreMove_(pos, rhs, ttMove, ply);
     });
 }
@@ -289,7 +286,7 @@ int Search::scoreMove_(const Position& pos, Move move, Move ttMove, int ply) con
     return history_[colorIdx][to_underlying(move.from())][to_underlying(move.to())];
 }
 
-void Search::updateQuietHeuristics_(const Position& pos, Move move, int ply, int depth) noexcept {
+void Search::updateQuietHeuristics_(const Position& pos, Move move, int ply, Depth depth) noexcept {
     if (ply < kMaxPly && move != killers_[ply][0]) {
         killers_[ply][1] = killers_[ply][0];
         killers_[ply][0] = move;
@@ -300,7 +297,7 @@ void Search::updateQuietHeuristics_(const Position& pos, Move move, int ply, int
     historyScore += depth * depth;
 }
 
-int Search::scoreQMove_(const Position& pos, Move move) const noexcept {
+int Search::scoreQMove_(const Position& pos, Move move) noexcept {
     if (!move.isCapture() && !move.isPromotion())
         return -kMateScore;
 
@@ -314,7 +311,7 @@ int Search::scoreQMove_(const Position& pos, Move move) const noexcept {
         if (move.moveType() != MoveType::EnPassant)
             victim = piece_type(pos.pieceOn(move.to()));
 
-        score += 16 * kPieceValues[to_underlying(victim)] - attackerValue;
+        score += (16 * kPieceValues[to_underlying(victim)]) - attackerValue;
     }
 
     if (move.isPromotion())
@@ -323,7 +320,7 @@ int Search::scoreQMove_(const Position& pos, Move move) const noexcept {
     return score;
 }
 
-bool Search::isBadQCapture_(const Position& pos, Move move) const noexcept {
+bool Search::isBadQCapture_(const Position& pos, Move move) noexcept {
     if (!move.isCapture() || move.moveType() == MoveType::EnPassant)
         return false;
 
@@ -338,19 +335,19 @@ bool Search::isBadQCapture_(const Position& pos, Move move) const noexcept {
     return is_square_attacked(pos, move.to(), ~pos.sideToMove());
 }
 
-int Search::scoreQEvasion_(const Position& pos, Move move) const noexcept {
+int Search::scoreQEvasion_(const Position& pos, Move move) noexcept {
     if (move.isCapture() || move.isPromotion())
-        return 100000 + scoreQMove_(pos, move);
+        return 100'000 + scoreQMove_(pos, move);
 
     const PieceType mover = piece_type(pos.pieceOn(move.from()));
     if (mover == PieceType::King)
-        return 1000;
+        return 10'000;
 
-    return 10000 - kPieceValues[to_underlying(mover)];
+    return 10'000 - kPieceValues[to_underlying(mover)];
 }
 
-void Search::orderQMoves_(const Position& pos, MoveList& moves, bool inCheck) const noexcept {
-    std::sort(moves.begin(), moves.end(), [&](Move lhs, Move rhs) {
+void Search::orderQMoves_(const Position& pos, MoveList& moves, bool inCheck) noexcept {
+    std::ranges::sort(moves, [&](Move lhs, Move rhs) {
         const int lhsScore = inCheck ? scoreQEvasion_(pos, lhs) : scoreQMove_(pos, lhs);
         const int rhsScore = inCheck ? scoreQEvasion_(pos, rhs) : scoreQMove_(pos, rhs);
         return lhsScore > rhsScore;

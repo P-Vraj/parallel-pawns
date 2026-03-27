@@ -1,6 +1,7 @@
 #pragma once
 #include <format>
 #include <iostream>
+#include <ranges>
 #include <string>
 #include <utility>
 
@@ -142,6 +143,14 @@ constexpr Square to_square(std::string_view str) {
     return make_square(f, r);
 }
 
+inline std::string normalized_option_key(std::string_view name) {
+    std::string key(name);
+    std::ranges::transform(key, key.begin(), [](unsigned char ch) { return static_cast<char>(std::tolower(ch)); });
+    return key;
+}
+
+// Bitboard utils
+
 constexpr void set_bit(Bitboard& b, Square sq) noexcept {
     b |= bitboard(sq);
 }
@@ -166,4 +175,22 @@ constexpr int pop_lsb(Bitboard& b) noexcept {
 
 constexpr int bit_count(Bitboard b) noexcept {
     return __builtin_popcountll(b);
+}
+
+// String utils
+
+static inline void left_trim(std::string& s) {
+    s.erase(s.begin(), std::ranges::find_if(s, [](unsigned char ch) { return !std::isspace(ch); }));
+}
+
+static inline void right_trim(std::string& s) {
+    s.erase(
+        std::ranges::find_if(std::ranges::reverse_view(s), [](unsigned char ch) { return !std::isspace(ch); }).base(),
+        s.end()
+    );
+}
+
+static inline void trim(std::string& s) {
+    left_trim(s);
+    right_trim(s);
 }
