@@ -50,6 +50,9 @@ void UCIEngine::loop() {
         std::istringstream iss(line);
         std::string command;
         iss >> command;
+        trim(command);
+        if (command.empty())
+            continue;
 
         if (command == "uci") {
             std::cout << "id name Parfait\n";

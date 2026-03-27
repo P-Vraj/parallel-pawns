@@ -33,53 +33,14 @@ class TranspositionTable {
 public:
     TranspositionTable() noexcept = default;
     explicit TranspositionTable(size_t sizeMB) { resize(sizeMB); }
-    void resize(size_t sizeMB) {
-        // Round size down to nearest power of two for efficient indexing
-        const size_t roundedMB = std::max(std::bit_floor(sizeMB), static_cast<size_t>(1));
-        size_ = roundedMB * 1024 * 1024 / sizeof(TTEntry);
-        table_.resize(size_);
-        clear();
-    }
+    void resize(size_t sizeMB);
+    void clear() noexcept;
     size_t size() const noexcept { return size_; }
     bool empty() const noexcept { return size_ == 0; }
-    void clear() noexcept {
-        std::ranges::fill(table_.begin(), table_.end(), TTEntry{});
-        resetCounters();
-    }
     void newSearch() noexcept { ++age_; }
-    const TTEntry* probe(Key key) const noexcept {
-        if (empty()) {
-            ++misses_;
-            return nullptr;
-        }
-
-        const TTEntry& entry = table_[index_(key)];
-        if (entry.hash != key) {
-            ++misses_;
-            return nullptr;
-        }
-
-        ++hits_;
-        return &entry;
-    }
-    void store(Key key, Move move, TTScore score, uint8_t depth, Bound bound, int ply) noexcept {
-        if (empty())
-            return;
-
-        TTEntry& entry = table_[index_(key)];
-        const bool noEntry = (entry.hash == 0);
-        const bool replace = (entry.hash == key || entry.age != age_ || depth >= entry.depth - 2);
-
-        if (noEntry)
-            ++writes_;
-        else if (replace)
-            ++rewrites_;
-        else
-            return;
-
-        score = pack_TTScore(encode_mate_score(score, ply));
-        entry = TTEntry{key, score, move, bound, depth, age_};
-    }
+    
+    const TTEntry* probe(Key key) const noexcept;
+    void store(Key key, Move move, TTScore score, uint8_t depth, Bound bound, int ply) noexcept;
 
     // Statistics
     size_t hits() const noexcept { return hits_; }
