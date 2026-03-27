@@ -153,6 +153,8 @@ constexpr std::string to_string(const Option& option) {
     return std::string{};
 }
 
+// Bitboard utils
+
 constexpr void set_bit(Bitboard& b, Square sq) noexcept {
     b |= bitboard(sq);
 }
@@ -179,6 +181,8 @@ constexpr int bit_count(Bitboard b) noexcept {
     return __builtin_popcountll(b);
 }
 
+// String utils
+
 static inline void left_trim(std::string& s) {
     s.erase(s.begin(), std::ranges::find_if(s, [](unsigned char ch) { return !std::isspace(ch); }));
 }
@@ -188,7 +192,6 @@ static inline void right_trim(std::string& s) {
         std::ranges::find_if(std::ranges::reverse_view(s), [](unsigned char ch) { return !std::isspace(ch); }).base(),
         s.end()
     );
-    // left_trim(std::ranges::reverse_view(s));
 }
 
 static inline void trim(std::string& s) {

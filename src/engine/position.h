@@ -36,9 +36,9 @@ struct Position {
     constexpr uint8_t halfmoveClock() const noexcept { return halfmoveClock_; }
 
     // Creates a Position from a FEN string. Assumes the FEN is valid and well-formed.
-    static Position fromFEN(std::string_view fen) noexcept;
+    static Position fromFEN(std::string_view fen);
     // Converts the Position back to a FEN string.
-    std::string toFEN() const noexcept;
+    std::string toFEN() const;
     // Makes the given move on the position, updating the position and filling in the undo information.
     void makeMove(Move m, UndoInfo& undo) noexcept;
     // Undoes the given move using the provided undo information, restoring the position to its previous state.

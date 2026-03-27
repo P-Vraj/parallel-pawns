@@ -27,7 +27,7 @@ constexpr std::array<uint8_t, 64> make_castle_mask() {
 constexpr std::array<uint8_t, 64> kCastleMask = make_castle_mask();
 }  // namespace
 
-Position Position::fromFEN(std::string_view fen) noexcept {
+Position Position::fromFEN(std::string_view fen) {
     Position pos{};
     std::vector<std::string_view> fields;
     for (const auto field : fen | std::views::split(' ')) {
@@ -57,7 +57,7 @@ Position Position::fromFEN(std::string_view fen) noexcept {
     return pos;
 }
 
-std::string Position::toFEN() const noexcept {
+std::string Position::toFEN() const {
     std::string fen{};
 
     for (int r = 7; r >= 0; --r) {

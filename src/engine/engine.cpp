@@ -6,7 +6,7 @@
 
 namespace engine {
 
-void Engine::setOption_(std::string name, Option value) noexcept {
+void Engine::setOption_(std::string name, Option value) {
     std::ranges::transform(name, name.begin(), ::tolower);
 
     if (!options_.contains(name)) {
@@ -27,12 +27,12 @@ void Engine::setOption_(std::string name, Option value) noexcept {
     }
 }
 
-void Engine::setPosition_(std::string_view fen) noexcept {
+void Engine::setPosition_(std::string_view fen) {
     position_ = Position::fromFEN(fen);
     tt_.clear();
 }
 
-void Engine::debugSearch_() noexcept {
+void Engine::debugSearch_() {
     auto start = std::chrono::high_resolution_clock::now();
     const auto result = search();
     auto end = std::chrono::high_resolution_clock::now();
@@ -45,7 +45,7 @@ void Engine::debugSearch_() noexcept {
     std::cout << "Nodes searched (Search): " << result.nodes << '\n';
     std::cout << "Nodes searched (Quiescence): " << result.qNodes << '\n';
     std::cout << "Time taken: " << elapsed.count() << " seconds\n";
-    std::cout << "NPS (Total): " << (result.nodes + result.qNodes) / elapsed.count() << '\n';
+    std::cout << "NPS (Total): " << static_cast<double>((result.nodes + result.qNodes)) / elapsed.count() << '\n';
     std::cout << "TT size: " << (tt_.size() * sizeof(TTEntry)) / 1024 / 1024 << " MB\n";
     std::cout << "TT hits: " << tt_.hits() << '\n';
     std::cout << "TT misses: " << tt_.misses() << '\n';

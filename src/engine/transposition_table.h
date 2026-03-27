@@ -32,8 +32,8 @@ static_assert(sizeof(TTEntry) == 16);
 class TranspositionTable {
 public:
     TranspositionTable() noexcept = default;
-    explicit TranspositionTable(size_t sizeMB) noexcept { resize(sizeMB); }
-    void resize(size_t sizeMB) noexcept {
+    explicit TranspositionTable(size_t sizeMB) { resize(sizeMB); }
+    void resize(size_t sizeMB) {
         // Round size down to nearest power of two for efficient indexing
         const size_t roundedMB = std::max(std::bit_floor(sizeMB), static_cast<size_t>(1));
         size_ = roundedMB * 1024 * 1024 / sizeof(TTEntry);

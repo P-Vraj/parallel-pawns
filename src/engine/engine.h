@@ -23,8 +23,8 @@ inline void init_engine() noexcept {
 
 class Engine {
 public:
-    explicit Engine() noexcept { init_engine(); }
-    SearchResult search() noexcept { return search_.search(position_, searchLimits_); }
+    explicit Engine() { init_engine(); }
+    SearchResult search() { return search_.search(position_, searchLimits_); }
 
 private:
     friend class UCIEngine;
@@ -39,9 +39,9 @@ private:
     SearchLimits searchLimits_{ static_cast<uint8_t>(std::get<int>(options_["default depth"])) };
     Search search_{ &tt_ };
 
-    void setOption_(std::string name, Option value) noexcept;
-    void setPosition_(std::string_view fen) noexcept;
-    void debugSearch_() noexcept;
+    void setOption_(std::string name, Option value);
+    void setPosition_(std::string_view fen);
+    void debugSearch_();
 };
 
 }  // namespace engine

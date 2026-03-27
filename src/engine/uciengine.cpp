@@ -116,7 +116,7 @@ void UCIEngine::loop() {
             if (depth)
                 engine_.searchLimits_.depth = depth;
             engine_.debugSearch_();
-            engine_.searchLimits_.depth = static_cast<uint8_t>(std::get<int>(engine_.options_["default depth"]));
+            engine_.searchLimits_.depth = std::get<int>(engine_.options_["default depth"]);
         }
         else if (command == "quit") {
             break;

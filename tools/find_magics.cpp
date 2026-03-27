@@ -115,14 +115,19 @@ std::string header_to_string() {
 }  // namespace
 
 int main() {
-    auto rookMagics = find_magics(PieceType::Rook);
-    auto bishopMagics = find_magics(PieceType::Bishop);
+    try {
+        auto rookMagics = find_magics(PieceType::Rook);
+        auto bishopMagics = find_magics(PieceType::Bishop);
 
-    std::string out{};
-    out += header_to_string() + "\n";
-    out += magics_to_string("kRookMagics", rookMagics) + "\n";
-    out += magics_to_string("kBishopMagics", bishopMagics);
-    std::cout << out;
+        std::string out{};
+        out += header_to_string() + "\n";
+        out += magics_to_string("kRookMagics", rookMagics) + "\n";
+        out += magics_to_string("kBishopMagics", bishopMagics);
+        std::cout << out;
+    } catch (const std::exception& e) {
+        std::cerr << "Error finding magics: " << e.what() << "\n";
+        return EXIT_FAILURE;
+    }
 
     return 0;
 }
