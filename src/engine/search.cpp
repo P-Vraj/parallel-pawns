@@ -31,6 +31,10 @@ SearchResult Search::search(Position& pos, const SearchLimits& limits) {
     nodes_ = 0;
     qNodes_ = 0;
     resetHeuristics_();
+    pvLength_.fill(0);
+    for (auto& pvLine : pvTable_) {
+        pvLine.fill(Move::none());
+    }
 
     if (tt_ != nullptr)
         tt_->newSearch();
@@ -54,6 +58,7 @@ SearchResult Search::search(Position& pos, const SearchLimits& limits) {
     Eval bestScore = -kEvalInf;
 
     for (int currentDepth = 1; currentDepth <= limits.depth; ++currentDepth) {
+        pvLength_[0] = 0;
         Move ttMove = bestMove;
         if (tt_ != nullptr) {
             if (const TTEntry* entry = tt_->probe(pos.hash())) {
@@ -81,6 +86,15 @@ SearchResult Search::search(Position& pos, const SearchLimits& limits) {
             if (score > iterationBestScore) {
                 iterationBestScore = score;
                 iterationBestMove = m;
+
+                pvTable_[0][0] = m;
+                pvLength_[0] = 1;
+                if (kMaxPly > 1) {
+                    for (uint8_t i = 1; i < pvLength_[1] && i < kMaxPly; ++i) {
+                        pvTable_[0][i] = pvTable_[1][i];
+                        pvLength_[0] = static_cast<uint8_t>(i + 1);
+                    }
+                }
             }
 
             alpha = std::max(alpha, score);
@@ -94,11 +108,18 @@ SearchResult Search::search(Position& pos, const SearchLimits& limits) {
     result.score = bestScore;
     result.nodes = nodes_;
     result.qNodes = qNodes_;
+    result.pvLength = pvLength_[0];
+    for (uint8_t i = 0; i < result.pvLength; ++i) {
+        result.pv[i] = pvTable_[0][i];
+    }
     return result;
 }
 
 Eval Search::alphaBeta_(Position& pos, Depth depth, Eval alpha, Eval beta, int ply) {
     ++nodes_;
+
+    if (ply < kMaxPly)
+        pvLength_[ply] = static_cast<uint8_t>(ply);
 
     if (ply >= kMaxPly)
         return evaluate_(pos);
@@ -158,6 +179,15 @@ Eval Search::alphaBeta_(Position& pos, Depth depth, Eval alpha, Eval beta, int p
         if (score > bestScore) {
             bestScore = score;
             bestMove = m;
+
+            pvTable_[ply][ply] = m;
+            pvLength_[ply] = static_cast<uint8_t>(ply + 1);
+            if (ply + 1 < kMaxPly) {
+                for (auto i = static_cast<uint8_t>(ply + 1); i < pvLength_[ply + 1] && i < kMaxPly; ++i) {
+                    pvTable_[ply][i] = pvTable_[ply + 1][i];
+                    pvLength_[ply] = static_cast<uint8_t>(i + 1);
+                }
+            }
         }
 
         alpha = std::max(alpha, score);
@@ -184,6 +214,9 @@ Eval Search::alphaBeta_(Position& pos, Depth depth, Eval alpha, Eval beta, int p
 
 Eval Search::quiescence_(Position& pos, Eval alpha, Eval beta, int ply) {
     ++qNodes_;
+
+    if (ply < kMaxPly)
+        pvLength_[ply] = static_cast<uint8_t>(ply);
 
     if (ply >= kMaxPly)
         return evaluate_(pos);
@@ -224,10 +257,29 @@ Eval Search::quiescence_(Position& pos, Eval alpha, Eval beta, int ply) {
 
         pos.undoMove(m, u);
 
-        if (score >= beta)
+        if (score >= beta) {
+            pvTable_[ply][ply] = m;
+            pvLength_[ply] = static_cast<uint8_t>(ply + 1);
+            if (ply + 1 < kMaxPly) {
+                for (auto i = static_cast<uint8_t>(ply + 1); i < pvLength_[ply + 1] && i < kMaxPly; ++i) {
+                    pvTable_[ply][i] = pvTable_[ply + 1][i];
+                    pvLength_[ply] = static_cast<uint8_t>(i + 1);
+                }
+            }
             return score;
+        }
 
-        alpha = std::max(alpha, score);
+        if (score > alpha) {
+            alpha = score;
+            pvTable_[ply][ply] = m;
+            pvLength_[ply] = static_cast<uint8_t>(ply + 1);
+            if (ply + 1 < kMaxPly) {
+                for (auto i = static_cast<uint8_t>(ply + 1); i < pvLength_[ply + 1] && i < kMaxPly; ++i) {
+                    pvTable_[ply][i] = pvTable_[ply + 1][i];
+                    pvLength_[ply] = static_cast<uint8_t>(i + 1);
+                }
+            }
+        }
     }
 
     return alpha;
@@ -252,7 +304,7 @@ bool Search::isTerminal_(const Position& pos, const MoveList& moves, int ply, Ev
 
 void Search::resetHeuristics_() noexcept {
     for (auto& plyKillers : killers_) {
-        plyKillers = { Move::none(), Move::none() };
+        plyKillers = {Move::none(), Move::none()};
     }
 
     for (auto& colorHistory : history_) {

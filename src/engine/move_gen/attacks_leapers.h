@@ -13,7 +13,7 @@ constexpr std::array<Bitboard, 64> generate_non_sliding_attacks_table(std::span<
         for (const auto& [dr, df] : deltas) {
             const File f = file(sq) + df;
             const Rank r = rank(sq) + dr;
-            if (is_valid(f, r)) {
+            if (is_valid(f) && is_valid(r)) {
                 attacksBitboard |= bitboard(make_square(f, r));
             }
         }
@@ -25,14 +25,14 @@ constexpr std::array<Bitboard, 64> generate_non_sliding_attacks_table(std::span<
 
 constexpr std::array<Bitboard, 64> generate_knight_attacks_table() {
     constexpr std::array<std::pair<int, int>, 8> knightMoves{
-        { { +2, +1 }, { +2, -1 }, { +1, +2 }, { +1, -2 }, { -2, +1 }, { -2, -1 }, { -1, +2 }, { -1, -2 } }
+        {{+2, +1}, {+2, -1}, {+1, +2}, {+1, -2}, {-2, +1}, {-2, -1}, {-1, +2}, {-1, -2}}
     };
     return generate_non_sliding_attacks_table(knightMoves);
 }
 
 constexpr std::array<Bitboard, 64> generate_king_attacks_table() {
     constexpr std::array<std::pair<int, int>, 8> kingMoves{
-        { { +1, 0 }, { -1, 0 }, { 0, +1 }, { 0, -1 }, { +1, +1 }, { +1, -1 }, { -1, +1 }, { -1, -1 } }
+        {{+1, 0}, {-1, 0}, {0, +1}, {0, -1}, {+1, +1}, {+1, -1}, {-1, +1}, {-1, -1}}
     };
     return generate_non_sliding_attacks_table(kingMoves);
 }
@@ -40,12 +40,13 @@ constexpr std::array<Bitboard, 64> generate_king_attacks_table() {
 template <Color C>
 constexpr std::array<Bitboard, 64> generate_pawn_attacks_table() {
     constexpr int forward = (C == Color::White) ? +1 : -1;
-    constexpr std::array<std::pair<int, int>, 2> pawnMoves{ { { forward, +1 }, { forward, -1 } } };
+    constexpr std::array<std::pair<int, int>, 2> pawnMoves{{{forward, +1}, {forward, -1}}};
     return generate_non_sliding_attacks_table(pawnMoves);
 }
 
 inline constexpr std::array<Bitboard, 64> kKnightAttacksTable = generate_knight_attacks_table();
 inline constexpr std::array<Bitboard, 64> kKingAttacksTable = generate_king_attacks_table();
 inline constexpr std::array<std::array<Bitboard, 64>, 2> kPawnAttacksTable = {
-    generate_pawn_attacks_table<Color::White>(), generate_pawn_attacks_table<Color::Black>()
+    generate_pawn_attacks_table<Color::White>(),
+    generate_pawn_attacks_table<Color::Black>()
 };

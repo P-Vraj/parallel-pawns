@@ -34,25 +34,22 @@ inline std::string to_string(Color c) {
 
 inline std::string to_string(Piece p) {
     const char pt = to_char(piece_type(p));
-    if (color(p) == Color::White) {
-        return std::string{ static_cast<char>(toupper(pt)) };
-    }
-    return std::string{ pt };
+    if (color(p) == Color::White)
+        return std::string{static_cast<char>(toupper(pt))};
+    return std::string{pt};
 }
 
 inline std::string to_string(Square sq) {
-    if (sq == Square::None) {
+    if (sq == Square::None)
         return "0000";  // UCI nullmove
-    }
     const char f = static_cast<char>('a' + to_underlying(file(sq)));
     const char r = static_cast<char>('1' + to_underlying(rank(sq)));
-    return std::string{ f, r };
+    return std::string{f, r};
 }
 
 inline std::string to_string(CastlingRights cr) {
-    if (cr == CastlingRights::None) {
+    if (cr == CastlingRights::None)
         return "-";
-    }
     std::string s{};
     if ((cr & CastlingRights::WhiteKingside) != CastlingRights::None)
         s += 'K';
@@ -67,7 +64,7 @@ inline std::string to_string(CastlingRights cr) {
 
 // Long algebraic notation format
 inline std::string to_string(Move m) {
-    const std::string promo = m.isPromotion() ? std::string{ to_char(m.promotionType()) } : "";
+    const std::string promo = m.isPromotion() ? std::string{to_char(m.promotionType())} : "";
     return to_string(m.from()) + to_string(m.to()) + promo;
 }
 
@@ -80,7 +77,7 @@ inline std::string to_string(Bitboard b) {
             const Square sq = make_square(static_cast<File>(f), static_cast<Rank>(r));
             out += (b & bitboard(sq)) ? "| * " : "|   ";
         }
-        out += "| " + std::string{ static_cast<char>('1' + r) };
+        out += "| " + std::string{static_cast<char>('1' + r)};
         out += "\n" + divider + "\n";
     }
 
@@ -98,7 +95,7 @@ inline std::string to_string(const Position& pos) {
             const Piece p = pos.pieceOn(sq);
             out += "| " + to_string(p) + " ";
         }
-        out += "| " + std::string{ static_cast<char>('1' + r) };
+        out += "| " + std::string{static_cast<char>('1' + r)};
         out += "\n" + divider + "\n";
     }
 
@@ -126,18 +123,16 @@ constexpr PieceType to_piece_type(char c) {
 }
 
 constexpr Piece to_piece(char c) {
-    if (c == '.' || c == '?') {
+    if (c == '.' || c == '?')
         return Piece::None;
-    }
     const Color color = isupper(c) ? Color::White : Color::Black;
     const PieceType pt = to_piece_type(c);
     return make_piece(color, pt);
 }
 
 constexpr Square to_square(std::string_view str) {
-    if (str == "0000") {
+    if (str == "0000")
         return Square::None;  // UCI nullmove
-    }
     const File f = static_cast<File>(tolower(str[0]) - 'a');
     const Rank r = static_cast<Rank>(str[1] - '1');
     return make_square(f, r);
@@ -179,18 +174,18 @@ constexpr int bit_count(Bitboard b) noexcept {
 
 // String utils
 
-static inline void left_trim(std::string& s) {
+inline void left_trim(std::string& s) {
     s.erase(s.begin(), std::ranges::find_if(s, [](unsigned char ch) { return !std::isspace(ch); }));
 }
 
-static inline void right_trim(std::string& s) {
+inline void right_trim(std::string& s) {
     s.erase(
         std::ranges::find_if(std::ranges::reverse_view(s), [](unsigned char ch) { return !std::isspace(ch); }).base(),
         s.end()
     );
 }
 
-static inline void trim(std::string& s) {
+inline void trim(std::string& s) {
     left_trim(s);
     right_trim(s);
 }

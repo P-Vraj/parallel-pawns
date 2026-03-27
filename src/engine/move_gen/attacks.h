@@ -50,7 +50,7 @@ constexpr Bitboard piece_attacks(Square sq, Bitboard occ) noexcept {
         return rook_attacks(sq, occ);
     if constexpr (PT == PieceType::Queen)
         return queen_attacks(sq, occ);
-    return Bitboard{ 0 };
+    return Bitboard{0};
 }
 
 // Returns a bitboard of squares attacked by a piece of the given type for the square and (optional) occupancy.
@@ -65,7 +65,7 @@ constexpr Bitboard piece_attacks(PieceType pt, Square sq, Bitboard occ) noexcept
         case PieceType::Queen:
             return attacks::queen_attacks(sq, occ);
         default:
-            return Bitboard{ 0 };
+            return Bitboard{0};
     }
 }
 

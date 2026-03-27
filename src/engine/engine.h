@@ -1,5 +1,4 @@
 #pragma once
-#include <unordered_map>
 #include <vector>
 
 #include "geometry.h"
@@ -12,7 +11,7 @@
 
 namespace engine {
 
-constexpr std::string_view startpos = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
+inline constexpr std::string_view startpos = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
 
 static std::once_flag initFlag;
 inline void init_engine() noexcept {
@@ -37,11 +36,11 @@ private:
 
     std::vector<UCIOption> options_;
     Position position_{};
-    TranspositionTable tt_{ static_cast<size_t>(kDefaultHashMb) };
-    SearchLimits searchLimits_{ static_cast<uint8_t>(kDefaultDepth) };
-    Search search_{ &tt_ };
+    TranspositionTable tt_{static_cast<size_t>(kDefaultHashMb)};
+    SearchLimits searchLimits_{static_cast<uint8_t>(kDefaultDepth)};
+    Search search_{&tt_};
 
-    void setOption_(std::string name, std::string value);
+    void setOption_(std::string name, std::string_view value);
     const UCIOption& option_(std::string_view name) const;
     void applyOption_(const UCIOption& option);
     void setPosition_(std::string_view fen);

@@ -1,7 +1,9 @@
 #pragma once
 
+#include <array>
 #include <optional>
 
+#include "eval_constants.h"
 #include "move_gen/generator.h"
 #include "position.h"
 #include "transposition_table.h"
@@ -15,16 +17,17 @@ constexpr Eval absolute_eval(Eval score, Color sideToMove) noexcept {
 }
 
 struct SearchLimits {
-    Depth depth{ 1 };
+    Depth depth{1};
 };
 
 struct SearchResult {
-    uint64_t nodes{};   // Number of nodes searched
-    uint64_t qNodes{};  // Number of quiescence nodes searched
-    Eval score{};       // Relative evaluation of the position
-    Move bestMove;      // Best move found in the search, or `Move::none()` if no move found
+    uint64_t nodes{};                // Number of nodes searched
+    uint64_t qNodes{};               // Number of quiescence nodes searched
+    Eval score{};                    // Relative evaluation of the position
+    Move bestMove;                   // Best move found in the search, or `Move::none()` if no move found
+    std::array<Move, kMaxPly> pv{};  // Principal variation from the root
+    uint8_t pvLength{};              // Number of moves in `pv`
 };
-static_assert(sizeof(SearchResult) == 24);
 
 class Search {
 public:
@@ -47,9 +50,11 @@ private:
     static int scoreQEvasion_(const Position& pos, Move move) noexcept;
     static void orderQMoves_(const Position& pos, MoveList& moves, bool inCheck) noexcept;
 
-    TranspositionTable* tt_{ nullptr };
+    TranspositionTable* tt_{nullptr};
     uint64_t nodes_{};
     uint64_t qNodes_{};
+    std::array<std::array<Move, kMaxPly>, kMaxPly> pvTable_{};
+    std::array<uint8_t, kMaxPly> pvLength_{};
     std::array<std::array<Move, 2>, kMaxPly> killers_{};
     std::array<std::array<std::array<int, 64>, 64>, to_underlying(Color::Count)> history_{};
 };

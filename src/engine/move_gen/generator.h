@@ -7,11 +7,10 @@
 #include "attacks.h"
 
 struct MoveList;
-struct PinsInfo;
 
 enum class GenMode : uint8_t {
-    Legal,     // All legal moves, including quiet moves
-    Tactical,  // Captures, promotions, and king moves, but not quiet moves
+    Legal,     // All legal moves
+    Tactical,  // Captures and promotions, but not quiet/normal moves
     Evasions,  // Moves to get out of check (captures, king moves, and blocking moves)
 
     Count = 3
@@ -45,8 +44,6 @@ bool is_square_attacked(const Position& pos, Square sq, Color by, Bitboard occup
 bool is_square_attacked(const Position& pos, Square sq, Color by) noexcept;
 // Checks if any square in the given bitboard is attacked by any piece of the given color.
 bool is_any_square_attacked(const Position& pos, Bitboard b, Color by) noexcept;
-// Computes pinned pieces and their corresponding pin rays for the given position and side to move.
-PinsInfo compute_pins(const Position& pos, Color us) noexcept;
 // Generates all legal moves for the given position and appends them to the move list.
 void generate_moves(const Position& pos, MoveList& moveList, GenMode mode = GenMode::Legal) noexcept;
 
@@ -69,9 +66,4 @@ struct MoveList {
 private:
     std::array<Move, 256> data_{};
     uint8_t size_ = 0;
-};
-
-struct PinsInfo {
-    std::array<Bitboard, 64> pinRay{};  // Allowed destinations if pinned; ~0 if not pinned
-    Bitboard pinned = 0;
 };
