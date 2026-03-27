@@ -180,7 +180,7 @@ void Engine::startSearch_(
         const auto elapsedMs =
             static_cast<uint64_t>(std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count());
 
-        printSearchResult_(root, limits, result, elapsedMs);
+        printSearchResult_(limits, result, elapsedMs);
     });
 }
 
@@ -237,16 +237,10 @@ void Engine::mergeSearchResult_(SearchResult& aggregate, const SearchResult& wor
         aggregate = workerResult;
 }
 
-void Engine::printSearchResult_(
-    const Position& root,
-    const SearchLimits& limits,
-    const SearchResult& result,
-    uint64_t elapsedMs
-) {
+void Engine::printSearchResult_(const SearchLimits& limits, const SearchResult& result, uint64_t elapsedMs) {
     const uint64_t totalNodes = result.nodes + result.qNodes;
     const auto nps = elapsedMs == 0 ? totalNodes : (1000 * totalNodes) / elapsedMs;
 
-    // std::cout << "info string Search result for: " << root.toFEN() << '\n';
     // std::cout << "info string Score (Relative): " << result.score << '\n';
     // std::cout << "info string Score (Absolute): " << engine::absolute_eval(result.score, root.sideToMove()) << '\n';
     // std::cout << "info string Nodes searched (Search): " << result.nodes << '\n';

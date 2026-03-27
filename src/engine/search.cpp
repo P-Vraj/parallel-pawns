@@ -42,7 +42,7 @@ SearchResult Search::search(Position& pos, const SearchLimits& limits) {
         positionHistory_.push_back(pos.hash());
     }
 
-    const size_t reversiblePlies = static_cast<size_t>(pos.halfmoveClock());
+    const auto reversiblePlies = static_cast<size_t>(pos.halfmoveClock());
     irreversibleHistoryStart_ =
         (positionHistory_.size() > reversiblePlies + 1) ? (positionHistory_.size() - reversiblePlies - 1) : 0;
 

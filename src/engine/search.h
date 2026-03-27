@@ -104,8 +104,8 @@ private:
     std::array<std::array<std::array<int, 64>, 64>, to_underlying(Color::Count)> history_{};
 
     // History of position hashes (since the last irreversible move) for repetition detection
-    std::vector<Key> positionHistory_{};
-    std::vector<size_t> irreversibleHistoryStarts_{};
+    std::vector<Key> positionHistory_;
+    std::vector<size_t> irreversibleHistoryStarts_;
     size_t irreversibleHistoryStart_{0};
 };
 

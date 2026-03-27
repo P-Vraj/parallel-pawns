@@ -1,4 +1,5 @@
 #pragma once
+#include <cstdint>
 #include <format>
 #include <optional>
 #include <string>
@@ -27,7 +28,7 @@ enum class OptionType : uint8_t {
 struct UCIOption {
     static UCIOption check(std::string_view name, bool defaultValue);
     static UCIOption spin(std::string_view name, int defaultValue, int minValue, int maxValue);
-    static UCIOption string(std::string_view name, std::string defaultValue);
+    static UCIOption string(std::string_view name, std::string_view defaultValue);
 
     std::string uciDeclaration() const;
     bool setValue(std::string_view rawValue);

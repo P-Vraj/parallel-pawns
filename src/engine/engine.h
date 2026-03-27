@@ -1,4 +1,5 @@
 #pragma once
+#include <mutex>
 #include <thread>
 #include <vector>
 
@@ -21,10 +22,10 @@ inline void init_engine() noexcept {
         attacks::init_attack_tables();
         geom::init_geometry_tables();
 
-        if (const std::atomic<PackedTTEntry> tableEntry{}; !tableEntry.is_lock_free()) {
-            std::cerr << "Lock-free atomic transposition table entries are not available on this platform!\n";
-            std::exit(EXIT_FAILURE);
-        }
+        static_assert(
+            std::atomic<PackedTTEntry>::is_always_lock_free,
+            "Lock-free atomic transposition table entries are not available on this platform!\n"
+        );
     });
 }
 
@@ -68,12 +69,7 @@ private:
     void stopSearch_();
     SearchResult runSearch_(const Position& root, const SearchLimits& limits);
     static void mergeSearchResult_(SearchResult& aggregate, const SearchResult& workerResult, bool preferWorker);
-    void printSearchResult_(
-        const Position& root,
-        const SearchLimits& limits,
-        const SearchResult& result,
-        uint64_t elapsedMs
-    );
+    void printSearchResult_(const SearchLimits& limits, const SearchResult& result, uint64_t elapsedMs);
 };
 
 }  // namespace engine

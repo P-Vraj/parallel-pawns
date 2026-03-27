@@ -153,11 +153,11 @@ struct PerftCase {
 };
 
 // Tests that the number of nodes at each depth matches known values for different positions
+// Test cases referenced from the Chess Programming Wiki page on perft
+// Read more here: https://www.chessprogramming.org/Perft_Results
 TEST_CASE("Perft", "[perft][movegen]") {
     engine::init_engine();
 
-    // Test cases referenced from the Chess Programming Wiki page on perft
-    // Read more here: https://www.chessprogramming.org/Perft_Results
     // clang-format off
     const std::vector<PerftCase> cases = {
         {
@@ -342,7 +342,7 @@ TEST_CASE("Move Generation Mode Invariants", "[movegen][invariants]") {
     }
 }
 
-TEST_CASE("Search Detects Draw Rules", "[search][draw]") {
+TEST_CASE("Draw Detection", "[search][draw]") {
     engine::init_engine();
 
     SECTION("Threefold repetition at root") {

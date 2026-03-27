@@ -1,5 +1,7 @@
 #pragma once
 
+#include <limits>
+
 #include "types.h"
 
 constexpr Eval kEvalInf = 32000;
