@@ -79,6 +79,8 @@ Engine::Engine() {
         UCIOption::spin("Threads", kDefaultThreads, 1, 1024)
     };
     init_engine();
+    position_ = Position::fromFEN(startpos);
+    positionHistory_.push_back(position_.hash());
 }
 
 Engine::~Engine() {
@@ -118,12 +120,26 @@ void Engine::applyOption_(const UCIOption& option) {
         searchLimits_.depth = static_cast<uint8_t>(option.getValue<int>());
     else if (option.key() == "threads")
         searchLimits_.threads = option.getValue<int>();
+
+    if (option.key() == "hash")
+        tt_.clear();
 }
 
 void Engine::setPosition_(std::string_view fen) {
     stopSearch_();
     position_ = Position::fromFEN(fen);
-    tt_.clear();
+    positionHistory_.clear();
+    positionHistory_.push_back(position_.hash());
+}
+
+void Engine::recordCurrentPosition_(bool irreversible) {
+    if (irreversible)
+        positionHistory_.clear();
+    positionHistory_.push_back(position_.hash());
+}
+
+bool Engine::isIrreversibleMove_(const Position& pos, Move move) noexcept {
+    return move.isCapture() || move.isPromotion() || piece_type(pos.pieceOn(move.from())) == PieceType::Pawn;
 }
 
 void Engine::startSearch_(
@@ -183,7 +199,7 @@ SearchResult Engine::runSearch_(const Position& root, const SearchLimits& limits
     for (int workerId = 0; workerId < threadCount; ++workerId) {
         workers.emplace_back([&, workerId]() {
             Position workerRoot = root;
-            Search worker(&tt_, &sharedSearchState_, workerId);
+            Search worker(&tt_, &sharedSearchState_, workerId, positionHistory_);
             workerResults[static_cast<size_t>(workerId)] = worker.search(workerRoot, limits);
         });
     }
@@ -230,20 +246,20 @@ void Engine::printSearchResult_(
     const uint64_t totalNodes = result.nodes + result.qNodes;
     const auto nps = elapsedMs == 0 ? totalNodes : (1000 * totalNodes) / elapsedMs;
 
-    std::cout << "info Search result for: " << root.toFEN() << '\n';
-    std::cout << "info Score (Relative): " << result.score << '\n';
-    std::cout << "info Score (Absolute): " << engine::absolute_eval(result.score, root.sideToMove()) << '\n';
-    std::cout << "info Nodes searched (Search): " << result.nodes << '\n';
-    std::cout << "info Nodes searched (Quiescence): " << result.qNodes << '\n';
-    std::cout << "info Time taken: " << (static_cast<double>(elapsedMs) / 1000.0F) << " seconds\n";
-    std::cout << "info NPS (Total): " << nps << '\n';
-    std::cout << "info TT size: " << (tt_.size() * sizeof(TTEntry)) / 1024 / 1024 << " MB\n";
-    std::cout << "info TT hits: " << tt_.hits() << '\n';
-    std::cout << "info TT misses: " << tt_.misses() << '\n';
-    std::cout << "info TT hit rate: " << tt_.hitRate() * 100.0F << "%\n";
-    std::cout << "info TT writes: " << tt_.writes() << '\n';
-    std::cout << "info TT rewrites: " << tt_.rewrites() << '\n';
-    std::cout << "info TT rewrite rate: " << tt_.rewriteRate() * 100.0F << "%\n";
+    // std::cout << "info Search result for: " << root.toFEN() << '\n';
+    // std::cout << "info Score (Relative): " << result.score << '\n';
+    // std::cout << "info Score (Absolute): " << engine::absolute_eval(result.score, root.sideToMove()) << '\n';
+    // std::cout << "info Nodes searched (Search): " << result.nodes << '\n';
+    // std::cout << "info Nodes searched (Quiescence): " << result.qNodes << '\n';
+    // std::cout << "info Time taken: " << (static_cast<double>(elapsedMs) / 1000.0F) << " seconds\n";
+    // std::cout << "info NPS (Total): " << nps << '\n';
+    // std::cout << "info TT size: " << (tt_.size() * sizeof(TTEntry)) / 1024 / 1024 << " MB\n";
+    // std::cout << "info TT hits: " << tt_.hits() << '\n';
+    // std::cout << "info TT misses: " << tt_.misses() << '\n';
+    // std::cout << "info TT hit rate: " << tt_.hitRate() * 100.0F << "%\n";
+    // std::cout << "info TT writes: " << tt_.writes() << '\n';
+    // std::cout << "info TT rewrites: " << tt_.rewrites() << '\n';
+    // std::cout << "info TT rewrite rate: " << tt_.rewriteRate() * 100.0F << "%\n";
 
     const Depth reportedDepth = result.completedDepth > 0 ? result.completedDepth : std::min<Depth>(limits.depth, 1);
     std::cout << "info depth " << reportedDepth << ' ';
@@ -253,6 +269,7 @@ void Engine::printSearchResult_(
     std::cout << '\n';
 
     std::cout << "bestmove " << to_string(result.bestMove) << '\n';
+    std::cout.flush();
 }
 
 }  // namespace engine

@@ -4,6 +4,7 @@
 #include <atomic>
 #include <chrono>
 #include <optional>
+#include <vector>
 
 #include "eval_constants.h"
 #include "move_gen/generator.h"
@@ -55,8 +56,13 @@ struct SearchSharedState {
 class Search {
 public:
     Search() = default;
-    explicit Search(TranspositionTable* tt, SearchSharedState* sharedState = nullptr, int workerId = 0) noexcept
-        : tt_(tt), sharedState_(sharedState), workerId_(workerId) {}
+    explicit Search(
+        TranspositionTable* tt,
+        SearchSharedState* sharedState = nullptr,
+        int workerId = 0,
+        std::vector<Key> rootHistory = {}
+    ) noexcept
+        : tt_(tt), sharedState_(sharedState), workerId_(workerId), positionHistory_(std::move(rootHistory)) {}
 
     SearchResult search(Position& pos, const SearchLimits& limits);
 
@@ -64,7 +70,7 @@ private:
     Eval alphaBeta_(Position& pos, Depth depth, Eval alpha, Eval beta, int ply);
     Eval quiescence_(Position& pos, Eval alpha, Eval beta, int ply);
     static Eval evaluate_(const Position& pos) noexcept;
-    static bool isTerminal_(const Position& pos, const MoveList& moves, int ply, Eval& terminalScore) noexcept;
+    bool isTerminal_(const Position& pos, const MoveList& moves, int ply, Eval& terminalScore) const noexcept;
     void resetHeuristics_() noexcept;
     void orderMoves_(const Position& pos, MoveList& moves, Move ttMove, int ply) const noexcept;
     int scoreMove_(const Position& pos, Move move, Move ttMove, int ply) const noexcept;
@@ -75,7 +81,12 @@ private:
     static void orderQMoves_(const Position& pos, MoveList& moves, bool inCheck) noexcept;
     bool shouldStopHard_() noexcept;
     bool shouldStopSoft_() const noexcept;
+    // Diversifies the move ordering of root moves based on the worker ID for Lazy SMP.
     void diversifyRootMoves_(MoveList& moves) const noexcept;
+    bool isDrawByRepetition_(const Position& pos) const noexcept;
+    static bool isIrreversibleMove_(const Position& pos, Move move) noexcept;
+    void pushHistory_(const Position& pos, bool irreversible);
+    void popHistory_() noexcept;
 
     TranspositionTable* tt_{nullptr};
     SearchSharedState* sharedState_{nullptr};
@@ -83,10 +94,19 @@ private:
     uint64_t nodes_{};
     uint64_t qNodes_{};
     bool aborted_{false};
+
+    // Principal variation table updated during search
     std::array<std::array<Move, kMaxPly>, kMaxPly> pvTable_{};
     std::array<uint8_t, kMaxPly> pvLength_{};
+
+    // Heuristic move ordering
     std::array<std::array<Move, 2>, kMaxPly> killers_{};
     std::array<std::array<std::array<int, 64>, 64>, to_underlying(Color::Count)> history_{};
+
+    // History of position hashes (since the last irreversible move) for repetition detection
+    std::vector<Key> positionHistory_{};
+    std::vector<size_t> irreversibleHistoryStarts_{};
+    size_t irreversibleHistoryStart_{0};
 };
 
 }  // namespace engine

@@ -2,12 +2,15 @@
 #include <cstdint>
 #include <cstdlib>
 #include <iostream>
+#include <ranges>
+#include <sstream>
 #include <string_view>
 #include <vector>
 
 #include "engine.h"
 #include "move_gen/generator.h"
 #include "position.h"
+#include "search.h"
 
 namespace {
 
@@ -121,6 +124,25 @@ void movegen_mode_invariants(Position& pos, Depth depth) {  // NOLINT(readabilit
     }
 }
 // NOLINTEND(misc-no-recursion)
+
+std::vector<Key> build_history(Position& pos, std::string_view movesUci) {
+    std::vector<Key> history{pos.hash()};
+    std::istringstream iss{std::string(movesUci)};
+    for (std::string uciMove; iss >> uciMove;) {
+        MoveList moves(pos);
+        auto* it = std::ranges::find_if(moves, [&](Move m) { return to_string(m) == uciMove; });
+        REQUIRE(it != moves.end());
+
+        const bool irreversible =
+            it->isCapture() || it->isPromotion() || piece_type(pos.pieceOn(it->from())) == PieceType::Pawn;
+        UndoInfo u{};
+        pos.makeMove(*it, u);
+        if (irreversible)
+            history.clear();
+        history.push_back(pos.hash());
+    }
+    return history;
+}
 
 }  // namespace
 
@@ -317,5 +339,30 @@ TEST_CASE("Move Generation Mode Invariants", "[movegen][invariants]") {
     for (const auto& tc : cases) {
         Position pos = Position::fromFEN(tc.fen);
         movegen_mode_invariants(pos, tc.depth);
+    }
+}
+
+TEST_CASE("Search Detects Draw Rules", "[search][draw]") {
+    engine::init_engine();
+
+    SECTION("Threefold repetition at root") {
+        Position pos = Position::fromFEN(engine::startpos);
+        const auto history = build_history(pos, "g1f3 g8f6 f3g1 f6g8 g1f3 g8f6 f3g1 f6g8");
+
+        engine::Search search(nullptr, nullptr, 0, history);
+        const engine::SearchResult result = search.search(pos, engine::SearchLimits{.depth = 4});
+
+        CHECK(result.score == kDrawScore);
+        CHECK(result.bestMove.isNone());
+    }
+
+    SECTION("Fifty-move rule at root") {
+        Position pos = Position::fromFEN("8/8/8/8/8/8/8/K6k w - - 100 1");
+
+        engine::Search search(nullptr);
+        const engine::SearchResult result = search.search(pos, engine::SearchLimits{.depth = 4});
+
+        CHECK(result.score == kDrawScore);
+        CHECK(result.bestMove.isNone());
     }
 }

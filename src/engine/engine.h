@@ -47,6 +47,7 @@ private:
 
     std::vector<UCIOption> options_;
     Position position_{};
+    std::vector<Key> positionHistory_{};
     TranspositionTable tt_{static_cast<size_t>(kDefaultHashMb)};
     SearchLimits searchLimits_{kDefaultDepth, kDefaultThreads};
     SearchSharedState sharedSearchState_{};
@@ -56,6 +57,8 @@ private:
     const UCIOption& option_(std::string_view name) const;
     void applyOption_(const UCIOption& option);
     void setPosition_(std::string_view fen);
+    void recordCurrentPosition_(bool irreversible);
+    static bool isIrreversibleMove_(const Position& pos, Move move) noexcept;
     void startSearch_(
         std::optional<Depth> depthOverride,
         bool infinite,

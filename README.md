@@ -7,7 +7,8 @@
 * C++23
 * Clang (v17+)
 * CMake (v3.20+)
-* Ccache
+* [Ccache](https://github.com/ccache/ccache)
+* [Fastchess](https://github.com/Disservin/fastchess)
 * clang-format (optional)
 * clang-tidy (optional)
 
