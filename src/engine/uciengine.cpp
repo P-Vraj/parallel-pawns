@@ -1,8 +1,48 @@
 #include "uciengine.h"
 
+#include <algorithm>
+#include <optional>
+#include <ranges>
 #include <sstream>
 
+#include "ucioption.h"
+
 namespace engine {
+
+namespace {
+
+struct ParsedSetOption {
+    std::string name;
+    std::string value;
+};
+
+std::optional<ParsedSetOption> parseSetOption(std::istringstream& iss) {
+    std::string token;
+    if (!(iss >> token) || token != "name")
+        return std::nullopt;
+
+    ParsedSetOption parsed;
+    while (iss >> token) {
+        if (token == "value")
+            break;
+        if (!parsed.name.empty())
+            parsed.name += ' ';
+        parsed.name += token;
+    }
+
+    if (parsed.name.empty())
+        return std::nullopt;
+
+    if (token == "value") {
+        std::getline(iss >> std::ws, parsed.value);
+        trim(parsed.value);
+    }
+
+    trim(parsed.name);
+    return parsed;
+}
+
+}  // namespace
 
 void UCIEngine::loop() {
     std::string line;
@@ -15,9 +55,7 @@ void UCIEngine::loop() {
             std::cout << "id name Parfait\n";
             std::cout << "id author Parallel Pawns\n\n";
 
-            for (const auto& [name, option] : engine_.options_) {
-                std::cout << "option name " << name << '\n';
-            }
+            for (const auto& option : engine_.options_) std::cout << option.uciDeclaration() << '\n';
 
             std::cout << "\nuciok\n";
         }
@@ -25,43 +63,12 @@ void UCIEngine::loop() {
             std::cout << "readyok\n";
         }
         else if (command == "setoption") {
-            std::string token, name, value;
-            while (iss >> token) {
-                if (token == "name") {
-                    // Parse possibly multi-word option name
-                    name.clear();
-                    value.clear();
-                    std::string word;
-                    while (iss >> word && word != "value") {
-                        if (!name.empty())
-                            name += " ";
-                        name += word;
-                    }
-                    // Parse possibly multi-word value, if found
-                    if (word == "value") {
-                        std::string valueWord;
-                        while (iss >> valueWord) {
-                            if (!value.empty())
-                                value += " ";
-                            value += valueWord;
-                        }
-                    }
-                    trim(name);
-                    trim(value);
-                    if (name.empty()) {
-                        std::cout << "Invalid setoption command: " << line << '\n';
-                        continue;
-                    }
-                    if (value == "true" || value == "false" || value == "on" || value == "off")
-                        engine_.setOption_(name, value == "true" || value == "on");
-                    else if (!value.empty() && std::ranges::all_of(value, ::isdigit))
-                        engine_.setOption_(name, std::stoi(value));
-                    else if (!value.empty())
-                        engine_.setOption_(name, value);
-                    else
-                        engine_.setOption_(name, true);  // If no value, treat it as a boolean (true)
-                }
+            const auto parsed = parseSetOption(iss);
+            if (!parsed.has_value()) {
+                std::cout << "Invalid setoption command: " << line << '\n';
+                continue;
             }
+            engine_.setOption_(parsed->name, parsed->value);
         }
         else if (command == "ucinewgame") {
             engine_.setPosition_(startpos);
@@ -116,7 +123,7 @@ void UCIEngine::loop() {
             if (depth)
                 engine_.searchLimits_.depth = depth;
             engine_.debugSearch_();
-            engine_.searchLimits_.depth = std::get<int>(engine_.options_["default depth"]);
+            engine_.searchLimits_.depth = static_cast<uint8_t>(engine_.option_("default depth").getValue<int>());
         }
         else if (command == "quit") {
             break;

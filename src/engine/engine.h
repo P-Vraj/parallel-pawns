@@ -1,11 +1,13 @@
 #pragma once
 #include <unordered_map>
+#include <vector>
 
 #include "geometry.h"
 #include "move_gen/attacks.h"
 #include "position.h"
 #include "search.h"
 #include "types.h"
+#include "ucioption.h"
 #include "zobrist.h"
 
 namespace engine {
@@ -23,23 +25,25 @@ inline void init_engine() noexcept {
 
 class Engine {
 public:
-    explicit Engine() { init_engine(); }
+    Engine();
     SearchResult search() { return search_.search(position_, searchLimits_); }
 
 private:
     friend class UCIEngine;
 
-    std::unordered_map<std::string, Option> options_{
-        { "hash", 256 },         // Default TT size in MB
-        { "default depth", 8 },  // Default search depth
-        { "threads", 1 },        // Number of threads to use
-    };
+    static constexpr int kDefaultHashMb = 256;
+    static constexpr int kDefaultDepth = 8;
+    static constexpr int kDefaultThreads = 1;
+
+    std::vector<UCIOption> options_;
     Position position_{};
-    TranspositionTable tt_{ static_cast<size_t>(std::get<int>(options_["hash"])) };
-    SearchLimits searchLimits_{ static_cast<uint8_t>(std::get<int>(options_["default depth"])) };
+    TranspositionTable tt_{ static_cast<size_t>(kDefaultHashMb) };
+    SearchLimits searchLimits_{ static_cast<uint8_t>(kDefaultDepth) };
     Search search_{ &tt_ };
 
-    void setOption_(std::string name, Option value);
+    void setOption_(std::string name, std::string value);
+    const UCIOption& option_(std::string_view name) const;
+    void applyOption_(const UCIOption& option);
     void setPosition_(std::string_view fen);
     void debugSearch_();
 };

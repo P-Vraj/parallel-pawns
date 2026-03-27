@@ -3,7 +3,6 @@
 #include <cassert>
 #include <cstdint>
 #include <utility>
-#include <variant>
 
 using std::to_underlying, std::size_t;
 
@@ -12,8 +11,6 @@ using Key = uint64_t;
 using Eval = int;
 using Depth = int;
 using TTScore = int16_t;
-
-using Option = std::variant<bool, int, std::string>;
 
 // clang-format off
 enum class Square : uint8_t {

@@ -143,14 +143,10 @@ constexpr Square to_square(std::string_view str) {
     return make_square(f, r);
 }
 
-constexpr std::string to_string(const Option& option) {
-    if (std::holds_alternative<bool>(option))
-        return std::get<bool>(option) ? "true" : "false";
-    if (std::holds_alternative<int>(option))
-        return std::to_string(std::get<int>(option));
-    if (std::holds_alternative<std::string>(option))
-        return std::get<std::string>(option);
-    return std::string{};
+inline std::string normalized_option_key(std::string_view name) {
+    std::string key(name);
+    std::ranges::transform(key, key.begin(), [](unsigned char ch) { return static_cast<char>(std::tolower(ch)); });
+    return key;
 }
 
 // Bitboard utils

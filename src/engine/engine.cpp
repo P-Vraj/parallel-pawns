@@ -1,30 +1,50 @@
 #include "engine.h"
 
+#include <algorithm>
+#include <cctype>
 #include <iostream>
 
 #include "uciengine.h"
+#include "util.h"
 
 namespace engine {
 
-void Engine::setOption_(std::string name, Option value) {
-    std::ranges::transform(name, name.begin(), ::tolower);
+Engine::Engine() {
+    options_ = { UCIOption::spin("Hash", kDefaultHashMb, 1, 65536),
+                 UCIOption::spin("Default Depth", kDefaultDepth, 1, 255),
+                 UCIOption::spin("Threads", kDefaultThreads, 1, 1024) };
+    init_engine();
+}
 
-    if (!options_.contains(name)) {
+void Engine::setOption_(std::string name, std::string value) {
+    auto option =
+        std::ranges::find_if(options_, [&](const UCIOption& opt) { return opt.key == normalized_option_key(name); });
+    if (option == options_.end()) {
         std::cout << "Unknown option: " << name << '\n';
         return;
     }
 
-    options_[name] = value;
-    if (name == "hash") {
-        if (const auto* size = std::get_if<int>(&value)) {
-            tt_.resize(static_cast<size_t>(*size));
-        }
+    if (!option->setValue(value)) {
+        std::cout << "Invalid option or value: " << option->name << ": " << value << '\n';
+        return;
     }
-    else if (name == "default depth") {
-        if (const auto* depth = std::get_if<int>(&value)) {
-            searchLimits_.depth = static_cast<uint8_t>(*depth);
-        }
-    }
+
+    applyOption_(*option);
+}
+
+const UCIOption& Engine::option_(std::string_view name) const {
+    auto it =
+        std::ranges::find_if(options_, [&](const UCIOption& opt) { return opt.key == normalized_option_key(name); });
+    if (it == options_.end())
+        throw std::invalid_argument("Unknown option: " + std::string(name));
+    return *it;
+}
+
+void Engine::applyOption_(const UCIOption& option) {
+    if (option.key == "hash")
+        tt_.resize(static_cast<size_t>(option.getValue<int>()));
+    else if (option.key == "default depth")
+        searchLimits_.depth = static_cast<uint8_t>(option.getValue<int>());
 }
 
 void Engine::setPosition_(std::string_view fen) {
