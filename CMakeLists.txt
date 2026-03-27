@@ -94,7 +94,7 @@ else()
   add_executable(engine "${CMAKE_SOURCE_DIR}/src/engine/main.cpp")
 endif()
 
-target_link_libraries(engine PRIVATE engine_core)
+target_link_libraries(engine PRIVATE engine_core atomic)
 
 # Tools
 add_executable(find_magics tools/find_magics.cpp)
@@ -175,6 +175,7 @@ target_include_directories(perft_tests SYSTEM PRIVATE
 target_link_libraries(perft_tests
   PRIVATE
   engine_core
+  atomic
   Catch2::Catch2WithMain
 )
 

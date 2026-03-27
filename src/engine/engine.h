@@ -1,4 +1,5 @@
 #pragma once
+#include <mutex>
 #include <thread>
 #include <vector>
 
@@ -21,10 +22,10 @@ inline void init_engine() noexcept {
         attacks::init_attack_tables();
         geom::init_geometry_tables();
 
-        if (const std::atomic<PackedTTEntry> tableEntry{}; !tableEntry.is_lock_free()) {
-            std::cerr << "Lock-free atomic transposition table entries are not available on this platform!\n";
-            std::exit(EXIT_FAILURE);
-        }
+        static_assert(
+            std::atomic<PackedTTEntry>::is_always_lock_free,
+            "Lock-free atomic transposition table entries are not available on this platform!\n"
+        );
     });
 }
 
@@ -47,6 +48,7 @@ private:
 
     std::vector<UCIOption> options_;
     Position position_{};
+    std::vector<Key> positionHistory_;
     TranspositionTable tt_{static_cast<size_t>(kDefaultHashMb)};
     SearchLimits searchLimits_{kDefaultDepth, kDefaultThreads};
     SearchSharedState sharedSearchState_{};
@@ -56,6 +58,8 @@ private:
     const UCIOption& option_(std::string_view name) const;
     void applyOption_(const UCIOption& option);
     void setPosition_(std::string_view fen);
+    void recordCurrentPosition_(bool irreversible);
+    static bool isIrreversibleMove_(const Position& pos, Move move) noexcept;
     void startSearch_(
         std::optional<Depth> depthOverride,
         bool infinite,
@@ -65,12 +69,7 @@ private:
     void stopSearch_();
     SearchResult runSearch_(const Position& root, const SearchLimits& limits);
     static void mergeSearchResult_(SearchResult& aggregate, const SearchResult& workerResult, bool preferWorker);
-    void printSearchResult_(
-        const Position& root,
-        const SearchLimits& limits,
-        const SearchResult& result,
-        uint64_t elapsedMs
-    );
+    void printSearchResult_(const SearchLimits& limits, const SearchResult& result, uint64_t elapsedMs);
 };
 
 }  // namespace engine

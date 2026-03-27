@@ -133,20 +133,24 @@ void UCIEngine::loop() {
             }
 
             std::cout << "\nuciok\n";
+            std::cout.flush();
         }
         else if (command == "isready") {
             std::cout << "readyok\n";
+            std::cout.flush();
         }
         else if (command == "setoption") {
             const auto parsed = parseSetOption(iss);
             if (!parsed.has_value()) {
-                std::cout << "Invalid setoption command: " << line << '\n';
+                std::cout << "info string Invalid setoption command: " << line << '\n';
+                std::cout.flush();
                 continue;
             }
             engine_.setOption_(parsed->name, parsed->value);
         }
         else if (command == "ucinewgame") {
             engine_.setPosition_(startpos);
+            engine_.tt_.clear();
         }
         else if (command == "position") {
             std::string fen{startpos};
@@ -166,11 +170,14 @@ void UCIEngine::loop() {
                 MoveList moveList(engine_.position_);
                 auto* it = std::ranges::find_if(moveList, [&](Move m) { return to_string(m) == uciMove; });
                 if (it != moveList.end()) {
+                    const bool irreversible = Engine::isIrreversibleMove_(engine_.position_, *it);
                     UndoInfo u{};
                     engine_.position_.makeMove(*it, u);
+                    engine_.recordCurrentPosition_(irreversible);
                 }
                 else {
-                    std::cout << "Invalid move in position command: " << uciMove << '\n';
+                    std::cout << "info string Invalid move in position command: " << uciMove << '\n';
+                    std::cout.flush();
                     continue;
                 }
             }
@@ -187,7 +194,8 @@ void UCIEngine::loop() {
             break;
         }
         else {
-            std::cout << "Unknown command: " << line << '\n';
+            std::cout << "info string Unknown command: " << line << '\n';
+            std::cout.flush();
         }
     }
 }

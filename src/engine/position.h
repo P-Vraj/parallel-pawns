@@ -15,19 +15,30 @@ struct Position {
     // Returns the bitboard of pieces of the given color and piece type.
     template <Color C, PieceType PT>
     constexpr Bitboard get() const noexcept {
+        assert(is_valid(C) && is_valid(PT));
         return pieces_[to_underlying(C)][to_underlying(PT) - 1];
     }
     // Returns the bitboard of pieces of the given color and piece type.
     constexpr Bitboard get(Color c, PieceType pt) const noexcept {
+        assert(is_valid(c) && is_valid(pt));
         return pieces_[to_underlying(c)][to_underlying(pt) - 1];
     }
     // Returns the piece on the given square, or `Piece::None` if the square is empty.
-    constexpr Piece pieceOn(Square sq) const noexcept { return pieceMap_[to_underlying(sq)]; }
+    constexpr Piece pieceOn(Square sq) const noexcept {
+        assert(is_valid(sq));
+        return pieceMap_[to_underlying(sq)];
+    }
     // Returns the bitboard of pieces of the given color
-    constexpr Bitboard occupancy(Color c) const noexcept { return colorOccupied_[to_underlying(c)]; }
+    constexpr Bitboard occupancy(Color c) const noexcept {
+        assert(is_valid(c));
+        return colorOccupied_[to_underlying(c)];
+    }
     // Returns the bitboard of all occupied squares.
     constexpr Bitboard occupancy() const noexcept { return occupied_; }
-    constexpr Square kingSquare(Color c) const noexcept { return kingSquare_[to_underlying(c)]; }
+    constexpr Square kingSquare(Color c) const noexcept {
+        assert(is_valid(c));
+        return kingSquare_[to_underlying(c)];
+    }
     constexpr Color sideToMove() const noexcept { return sideToMove_; }
     constexpr Square epSquare() const noexcept { return enPassantSquare_; }
     constexpr CastlingRights castlingRights() const noexcept { return castlingRights_; }

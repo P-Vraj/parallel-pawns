@@ -36,20 +36,26 @@ SearchResult Search::search(Position& pos, const SearchLimits& limits) {
     for (auto& pvLine : pvTable_) {
         pvLine.fill(Move::none());
     }
+    irreversibleHistoryStarts_.clear();
+    if (positionHistory_.empty() || positionHistory_.back() != pos.hash()) {
+        positionHistory_.clear();
+        positionHistory_.push_back(pos.hash());
+    }
+
+    const auto reversiblePlies = static_cast<size_t>(pos.halfmoveClock());
+    irreversibleHistoryStart_ =
+        (positionHistory_.size() > reversiblePlies + 1) ? (positionHistory_.size() - reversiblePlies - 1) : 0;
 
     SearchResult result{};
 
     MoveList moves(pos);
-
-    if (moves.empty()) {
-        Eval terminalScore = 0;
-        if (isTerminal_(pos, moves, 0, terminalScore)) {
-            result.score = terminalScore;
-            result.bestMove = Move{};
-            result.nodes = nodes_;
-            result.qNodes = qNodes_;
-            return result;
-        }
+    Eval terminalScore = 0;
+    if (isTerminal_(pos, moves, 0, terminalScore)) {
+        result.score = terminalScore;
+        result.bestMove = Move{};
+        result.nodes = nodes_;
+        result.qNodes = qNodes_;
+        return result;
     }
 
     Move bestMove = moves.empty() ? Move{} : moves[0];
@@ -89,11 +95,14 @@ SearchResult Search::search(Position& pos, const SearchLimits& limits) {
                 break;
             }
 
+            const bool irreversible = isIrreversibleMove_(pos, m);
             UndoInfo u{};
             pos.makeMove(m, u);
+            pushHistory_(pos, irreversible);
 
             const Eval score = -alphaBeta_(pos, currentDepth - 1, -beta, -alpha, 1);
 
+            popHistory_();
             pos.undoMove(m, u);
 
             if (aborted_) {
@@ -214,11 +223,14 @@ Eval Search::alphaBeta_(Position& pos, Depth depth, Eval alpha, Eval beta, int p
         if (shouldStopHard_())
             return 0;
 
+        const bool irreversible = isIrreversibleMove_(pos, m);
         UndoInfo u{};
         pos.makeMove(m, u);
+        pushHistory_(pos, irreversible);
 
         const Eval score = -alphaBeta_(pos, depth - 1, -beta, -alpha, ply + 1);
 
+        popHistory_();
         pos.undoMove(m, u);
 
         if (aborted_)
@@ -304,11 +316,14 @@ Eval Search::quiescence_(Position& pos, Eval alpha, Eval beta, int ply) {
                 continue;
         }
 
+        const bool irreversible = isIrreversibleMove_(pos, m);
         UndoInfo u{};
         pos.makeMove(m, u);
+        pushHistory_(pos, irreversible);
 
         const Eval score = -quiescence_(pos, -beta, -alpha, ply + 1);
 
+        popHistory_();
         pos.undoMove(m, u);
 
         if (aborted_)
@@ -347,7 +362,12 @@ Eval Search::evaluate_(const Position& pos) noexcept {
     return (pos.sideToMove() == Color::White) ? score : -score;
 }
 
-bool Search::isTerminal_(const Position& pos, const MoveList& moves, int ply, Eval& terminalScore) noexcept {
+bool Search::isTerminal_(const Position& pos, const MoveList& moves, int ply, Eval& terminalScore) const noexcept {
+    if (pos.halfmoveClock() >= 100 || isDrawByRepetition_(pos)) {
+        terminalScore = kDrawScore;
+        return true;
+    }
+
     if (!moves.empty())
         return false;
 
@@ -357,6 +377,41 @@ bool Search::isTerminal_(const Position& pos, const MoveList& moves, int ply, Ev
         terminalScore = kDrawScore;
 
     return true;
+}
+
+bool Search::isDrawByRepetition_(const Position& pos) const noexcept {
+    if (positionHistory_.size() < 3)
+        return false;
+
+    int priorOccurrences = 0;
+    const Key current = pos.hash();
+    for (size_t i = positionHistory_.size() - 3; i >= irreversibleHistoryStart_;) {
+        if (positionHistory_[i] == current && ++priorOccurrences >= 2)
+            return true;
+
+        if (i < irreversibleHistoryStart_ + 2)
+            break;
+        i -= 2;
+    }
+
+    return false;
+}
+
+bool Search::isIrreversibleMove_(const Position& pos, Move move) noexcept {
+    return move.isCapture() || move.isPromotion() || piece_type(pos.pieceOn(move.from())) == PieceType::Pawn;
+}
+
+void Search::pushHistory_(const Position& pos, bool irreversible) {
+    irreversibleHistoryStarts_.push_back(irreversibleHistoryStart_);
+    if (irreversible)
+        irreversibleHistoryStart_ = positionHistory_.size();
+    positionHistory_.push_back(pos.hash());
+}
+
+void Search::popHistory_() noexcept {
+    positionHistory_.pop_back();
+    irreversibleHistoryStart_ = irreversibleHistoryStarts_.back();
+    irreversibleHistoryStarts_.pop_back();
 }
 
 void Search::resetHeuristics_() noexcept {

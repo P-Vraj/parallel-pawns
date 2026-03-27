@@ -25,12 +25,12 @@ UCIOption UCIOption::spin(std::string_view name, int defaultValue, int minValue,
     return uciOption;
 }
 
-UCIOption UCIOption::string(std::string_view name, std::string defaultValue) {
+UCIOption UCIOption::string(std::string_view name, std::string_view defaultValue) {
     UCIOption uciOption;
     uciOption.name_ = name;
     uciOption.key_ = normalized_option_key(name);
     uciOption.type_ = OptionType::String;
-    uciOption.value_ = defaultValue;
+    uciOption.value_ = std::string{defaultValue};
     uciOption.min_ = std::nullopt;
     uciOption.max_ = std::nullopt;
     return uciOption;

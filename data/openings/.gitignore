@@ -1,0 +1,3 @@
+# Ignore opening book files (EPD and PGN)
+*.epd
+*.pgn

@@ -1,4 +1,5 @@
 #pragma once
+#include <algorithm>
 #include <format>
 #include <iostream>
 #include <ranges>
@@ -133,6 +134,7 @@ constexpr Piece to_piece(char c) {
 constexpr Square to_square(std::string_view str) {
     if (str == "0000")
         return Square::None;  // UCI nullmove
+    assert(str.size() == 2);
     const File f = static_cast<File>(tolower(str[0]) - 'a');
     const Rank r = static_cast<Rank>(str[1] - '1');
     return make_square(f, r);
