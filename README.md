@@ -1,5 +1,7 @@
 # Parallel Pawns
 
+***Parfait*** is a distributed chess engine, compliant with the UCI standard.
+
 ## Usage
 
 ### Requirements
@@ -8,7 +10,7 @@
 * Clang (v17+)
 * CMake (v3.20+)
 * [Ccache](https://github.com/ccache/ccache)
-* [Fastchess](https://github.com/Disservin/fastchess)
+* [Fastchess](https://github.com/Disservin/fastchess) (optional)
 * clang-format (optional)
 * clang-tidy (optional)
 
@@ -26,6 +28,7 @@ To build and run the engine, use:
 ```bash
 cmake --build build --target run
 ```
+To interact with ***Parfait*** through the command line, read the [UCI documentation](https://backscattering.de/chess/uci/).
 
 #### Formatter/Linter
 To format the code or run a static analysis, use:
@@ -45,4 +48,19 @@ Or to run a single test, such as "Perft", use:
 ctest --test-dir build -R "Perft" --output-on-failure
 ```
 
+#### Benchmarks
+To benchmark engine-vs-engine performance through real games, run the script:
+```bash
+sh ./scripts/run-fastchess.sh
+```
+To enable further logging, run:
+```bash
+WRITE_LOGS=1 sh ./scripts/run-fastchess.sh
+```
+This utilizes the Fastchess CLI to run games against engines, allowing for benchmarking and statistical analyses. Update the options by passing them through the command line or by modifying the script. View `./scripts/run-fastshess.sh` for more details.
+
+*Note*: Must have [Fastchess](https://github.com/Disservin/fastchess) installed.
+
+#### Miscellaneous
 You can find tool-specific build instructions within the files in `tools/`.
+You can find script-specific run instructions within the files in `scripts/`.

@@ -246,20 +246,20 @@ void Engine::printSearchResult_(
     const uint64_t totalNodes = result.nodes + result.qNodes;
     const auto nps = elapsedMs == 0 ? totalNodes : (1000 * totalNodes) / elapsedMs;
 
-    // std::cout << "info Search result for: " << root.toFEN() << '\n';
-    // std::cout << "info Score (Relative): " << result.score << '\n';
-    // std::cout << "info Score (Absolute): " << engine::absolute_eval(result.score, root.sideToMove()) << '\n';
-    // std::cout << "info Nodes searched (Search): " << result.nodes << '\n';
-    // std::cout << "info Nodes searched (Quiescence): " << result.qNodes << '\n';
-    // std::cout << "info Time taken: " << (static_cast<double>(elapsedMs) / 1000.0F) << " seconds\n";
-    // std::cout << "info NPS (Total): " << nps << '\n';
-    // std::cout << "info TT size: " << (tt_.size() * sizeof(TTEntry)) / 1024 / 1024 << " MB\n";
-    // std::cout << "info TT hits: " << tt_.hits() << '\n';
-    // std::cout << "info TT misses: " << tt_.misses() << '\n';
-    // std::cout << "info TT hit rate: " << tt_.hitRate() * 100.0F << "%\n";
-    // std::cout << "info TT writes: " << tt_.writes() << '\n';
-    // std::cout << "info TT rewrites: " << tt_.rewrites() << '\n';
-    // std::cout << "info TT rewrite rate: " << tt_.rewriteRate() * 100.0F << "%\n";
+    // std::cout << "info string Search result for: " << root.toFEN() << '\n';
+    // std::cout << "info string Score (Relative): " << result.score << '\n';
+    // std::cout << "info string Score (Absolute): " << engine::absolute_eval(result.score, root.sideToMove()) << '\n';
+    // std::cout << "info string Nodes searched (Search): " << result.nodes << '\n';
+    // std::cout << "info string Nodes searched (Quiescence): " << result.qNodes << '\n';
+    // std::cout << "info string Time taken: " << (static_cast<double>(elapsedMs) / 1000.0F) << " seconds\n";
+    // std::cout << "info string NPS (Total): " << nps << '\n';
+    // std::cout << "info string TT size: " << (tt_.size() * sizeof(TTEntry)) / 1024 / 1024 << " MB\n";
+    // std::cout << "info string TT hits: " << tt_.hits() << '\n';
+    // std::cout << "info string TT misses: " << tt_.misses() << '\n';
+    // std::cout << "info string TT hit rate: " << tt_.hitRate() * 100.0F << "%\n";
+    // std::cout << "info string TT writes: " << tt_.writes() << '\n';
+    // std::cout << "info string TT rewrites: " << tt_.rewrites() << '\n';
+    // std::cout << "info string TT rewrite rate: " << tt_.rewriteRate() * 100.0F << "%\n";
 
     const Depth reportedDepth = result.completedDepth > 0 ? result.completedDepth : std::min<Depth>(limits.depth, 1);
     std::cout << "info depth " << reportedDepth << ' ';
