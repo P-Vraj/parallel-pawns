@@ -19,6 +19,11 @@ inline void init_engine() noexcept {
         zobrist::init_zobrist();
         attacks::init_attack_tables();
         geom::init_geometry_tables();
+
+        if (const std::atomic<PackedTTEntry> tableEntry{}; !tableEntry.is_lock_free()) {
+            std::cerr << "Lock-free atomic transposition table entries are not available on this platform!\n";
+            std::exit(EXIT_FAILURE);
+        }
     });
 }
 

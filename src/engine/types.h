@@ -330,12 +330,11 @@ constexpr bool is_valid(MoveType moveType) noexcept {
     return to_underlying(moveType) <= to_underlying(MoveType::PromotionCaptureQueen);
 };
 
+// A move is packed into 16 bits as follows:
+// Bits 0-5:    From square
+// Bits 6-11:   To square
+// Bits 12-15:  Move type
 struct Move {
-    // A move is packed into 16 bits as follows:
-    // Bits 0-5:    From square
-    // Bits 6-11:   To square
-    // Bits 12-15:  Move type
-
     constexpr Move() noexcept : data_(0) {}
     constexpr explicit Move(uint16_t data) noexcept : data_(data) {}
     constexpr Move(Square from, Square to, MoveType moveType) noexcept

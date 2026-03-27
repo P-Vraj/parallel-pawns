@@ -61,9 +61,10 @@ SearchResult Search::search(Position& pos, const SearchLimits& limits) {
         pvLength_[0] = 0;
         Move ttMove = bestMove;
         if (tt_ != nullptr) {
-            if (const TTEntry* entry = tt_->probe(pos.hash())) {
-                if (!entry->bestMove.isNone())
-                    ttMove = entry->bestMove;
+            if (const auto hit = tt_->probe(pos.hash())) {
+                const TTEntry& entry = *hit;
+                if (!entry.bestMove.isNone())
+                    ttMove = entry.bestMove;
             }
         }
 
@@ -138,13 +139,13 @@ Eval Search::alphaBeta_(Position& pos, Depth depth, Eval alpha, Eval beta, int p
     Move ttMove{};
 
     if (tt_ != nullptr) {
-        if (const TTEntry* entry = tt_->probe(key)) {
-            ttMove = entry->bestMove;
-            const Eval ttScore = decode_mate_score(unpack_TTScore(entry->score), ply);
+        if (const auto hit = tt_->probe(key)) {
+            const TTEntry& entry = *hit;
+            const Eval ttScore = decode_mate_score(unpack_TTScore(entry.score), ply);
 
-            const auto entryDepth = static_cast<Depth>(entry->depth);
+            const auto entryDepth = static_cast<Depth>(entry.depth);
             if (entryDepth >= depth) {
-                switch (entry->bound) {
+                switch (entry.bound) {
                     case Bound::Exact:
                         return ttScore;
                     case Bound::Lower:
@@ -160,6 +161,8 @@ Eval Search::alphaBeta_(Position& pos, Depth depth, Eval alpha, Eval beta, int p
                         break;
                 }
             }
+
+            ttMove = entry.bestMove;
         }
     }
 
