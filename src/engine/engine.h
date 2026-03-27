@@ -1,4 +1,5 @@
 #pragma once
+#include <thread>
 #include <vector>
 
 #include "geometry.h"
@@ -30,7 +31,12 @@ inline void init_engine() noexcept {
 class Engine {
 public:
     Engine();
-    SearchResult search() { return search_.search(position_, searchLimits_); }
+    ~Engine();
+
+    Engine(const Engine&) = delete;
+    Engine& operator=(const Engine&) = delete;
+    Engine(Engine&&) = delete;
+    Engine& operator=(Engine&&) = delete;
 
 private:
     friend class UCIEngine;
@@ -42,14 +48,29 @@ private:
     std::vector<UCIOption> options_;
     Position position_{};
     TranspositionTable tt_{static_cast<size_t>(kDefaultHashMb)};
-    SearchLimits searchLimits_{static_cast<uint8_t>(kDefaultDepth)};
-    Search search_{&tt_};
+    SearchLimits searchLimits_{kDefaultDepth, kDefaultThreads};
+    SearchSharedState sharedSearchState_{};
+    std::thread searchThread_;
 
     void setOption_(std::string name, std::string_view value);
     const UCIOption& option_(std::string_view name) const;
     void applyOption_(const UCIOption& option);
     void setPosition_(std::string_view fen);
-    void debugSearch_();
+    void startSearch_(
+        std::optional<Depth> depthOverride,
+        bool infinite,
+        std::optional<std::chrono::milliseconds> moveTime,
+        std::optional<SearchLimits::TimeControl> timeControl
+    );
+    void stopSearch_();
+    SearchResult runSearch_(const Position& root, const SearchLimits& limits);
+    static void mergeSearchResult_(SearchResult& aggregate, const SearchResult& workerResult, bool preferWorker);
+    void printSearchResult_(
+        const Position& root,
+        const SearchLimits& limits,
+        const SearchResult& result,
+        uint64_t elapsedMs
+    );
 };
 
 }  // namespace engine

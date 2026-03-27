@@ -16,6 +16,13 @@ struct ParsedSetOption {
     std::string value;
 };
 
+struct ParsedGo {
+    std::optional<Depth> depth;
+    bool infinite{false};
+    std::optional<std::chrono::milliseconds> moveTime;
+    std::optional<SearchLimits::TimeControl> timeControl;
+};
+
 std::optional<ParsedSetOption> parseSetOption(std::istringstream& iss) {
     std::string token;
     if (!(iss >> token) || token != "name")
@@ -39,6 +46,69 @@ std::optional<ParsedSetOption> parseSetOption(std::istringstream& iss) {
     }
 
     trim(parsed.name);
+    return parsed;
+}
+
+ParsedGo parseGo(std::istringstream& iss) {
+    ParsedGo parsed;
+    SearchLimits::TimeControl timeControl;
+    bool hasTimeControl = false;
+
+    std::string token;
+    while (iss >> token) {
+        if (token == "depth") {
+            Depth depth = 0;
+            if (iss >> depth)
+                parsed.depth = depth;
+        }
+        else if (token == "movetime") {
+            int moveTimeMs = 0;
+            if (iss >> moveTimeMs)
+                parsed.moveTime = std::chrono::milliseconds(moveTimeMs);
+        }
+        else if (token == "wtime") {
+            int timeMs = 0;
+            if (iss >> timeMs) {
+                timeControl.whiteTime = std::chrono::milliseconds(timeMs);
+                hasTimeControl = true;
+            }
+        }
+        else if (token == "btime") {
+            int timeMs = 0;
+            if (iss >> timeMs) {
+                timeControl.blackTime = std::chrono::milliseconds(timeMs);
+                hasTimeControl = true;
+            }
+        }
+        else if (token == "winc") {
+            int timeMs = 0;
+            if (iss >> timeMs) {
+                timeControl.whiteIncrement = std::chrono::milliseconds(timeMs);
+                hasTimeControl = true;
+            }
+        }
+        else if (token == "binc") {
+            int timeMs = 0;
+            if (iss >> timeMs) {
+                timeControl.blackIncrement = std::chrono::milliseconds(timeMs);
+                hasTimeControl = true;
+            }
+        }
+        else if (token == "movestogo") {
+            int movesToGo = 0;
+            if (iss >> movesToGo) {
+                timeControl.movesToGo = movesToGo;
+                hasTimeControl = true;
+            }
+        }
+        else if (token == "infinite") {
+            parsed.infinite = true;
+        }
+    }
+
+    if (hasTimeControl)
+        parsed.timeControl = timeControl;
+
     return parsed;
 }
 
@@ -106,20 +176,14 @@ void UCIEngine::loop() {
             }
         }
         else if (command == "go") {
-            std::string token;
-            Depth depth = 0;
-            while (iss >> token) {
-                if (token == "depth") {
-                    iss >> depth;
-                }
-            }
-            // Override engine's default depth for this search, before resetting it back to the default
-            if (depth)
-                engine_.searchLimits_.depth = depth;
-            engine_.debugSearch_();
-            engine_.searchLimits_.depth = static_cast<uint8_t>(engine_.option_("default depth").getValue<int>());
+            const ParsedGo go = parseGo(iss);
+            engine_.startSearch_(go.depth, go.infinite, go.moveTime, go.timeControl);
+        }
+        else if (command == "stop") {
+            engine_.stopSearch_();
         }
         else if (command == "quit") {
+            engine_.stopSearch_();
             break;
         }
         else {
