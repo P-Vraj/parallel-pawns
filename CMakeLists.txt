@@ -80,7 +80,7 @@ target_link_libraries(engine_core PUBLIC engine_warnings engine_opts)
 # Removes engine.cpp from engine_core
 get_target_property(_engine_core_sources engine_core SOURCES)
 foreach(_src IN LISTS _engine_core_sources)
-  if(_src MATCHES ".*/engine\\.cpp$")
+  if(_src MATCHES ".*/main\\.cpp$")
     list(REMOVE_ITEM _engine_core_sources "${_src}")
     set_target_properties(engine_core PROPERTIES SOURCES "${_engine_core_sources}")
     set(_engine_main "${_src}")
@@ -91,7 +91,7 @@ if(DEFINED _engine_main)
   add_executable(engine "${_engine_main}")
 else()
   # Main source
-  add_executable(engine "${CMAKE_SOURCE_DIR}/src/engine/engine.cpp")
+  add_executable(engine "${CMAKE_SOURCE_DIR}/src/engine/main.cpp")
 endif()
 
 target_link_libraries(engine PRIVATE engine_core)

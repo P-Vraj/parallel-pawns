@@ -170,6 +170,7 @@ void generate_pawn_moves(const Position& pos, const State& state, MoveList& move
             push_pawn_attacks(from, doubleTargets, state.themOcc, state.us, MoveType::PawnDoubleStep, moveList);
         }
     }
+    // Non-capturing promotions
     else {
         Bitboard p = pawns;
         while (p) {

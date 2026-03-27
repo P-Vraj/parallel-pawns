@@ -11,11 +11,8 @@
 
 namespace {
 
-bool contains_move(const MoveList& moves, Move target) {
-    return std::find(moves.begin(), moves.end(), target) != moves.end();
-}
-
-uint64_t perft(Position& pos, int depth) {  // NOLINT(misc-no-recursion)
+// NOLINTBEGIN(misc-no-recursion)
+uint64_t perft(Position& pos, Depth depth) {
     if (depth <= 0)
         return 1;
 
@@ -35,7 +32,7 @@ uint64_t perft(Position& pos, int depth) {  // NOLINT(misc-no-recursion)
     return nodes;
 }
 
-uint64_t divide(Position& pos, int depth) {  // NOLINT(misc-no-recursion)
+uint64_t divide(Position& pos, Depth depth) {
     if (depth <= 0)
         return 1;
 
@@ -56,7 +53,7 @@ uint64_t divide(Position& pos, int depth) {  // NOLINT(misc-no-recursion)
     return nodes;
 }
 
-void state_invariants(Position& pos, int depth) {  // NOLINT(misc-no-recursion)
+void state_invariants(Position& pos, Depth depth) {
     if (depth <= 0)
         return;
 
@@ -79,23 +76,23 @@ void state_invariants(Position& pos, int depth) {  // NOLINT(misc-no-recursion)
     }
 }
 
-void movegen_mode_invariants(Position& pos, int depth) {  // NOLINT(misc-no-recursion)
+void movegen_mode_invariants(Position& pos, Depth depth) {  // NOLINT(readability-function-cognitive-complexity)
     if (depth <= 0)
         return;
 
-    MoveList legalMoves(pos, GenMode::Legal);
-    MoveList tacticalMoves(pos, GenMode::Tactical);
+    const MoveList legalMoves(pos, GenMode::Legal);
+    const MoveList tacticalMoves(pos, GenMode::Tactical);
     const bool inCheck = pos.inCheck();
 
     if (inCheck) {
-        MoveList evasions(pos, GenMode::Evasions);
+        const MoveList evasions(pos, GenMode::Evasions);
 
         REQUIRE(legalMoves.size() == evasions.size());
         REQUIRE(legalMoves.size() == tacticalMoves.size());
 
         for (const Move m : legalMoves) {
-            CHECK(contains_move(evasions, m));
-            CHECK(contains_move(tacticalMoves, m));
+            CHECK(evasions.contains(m));
+            CHECK(tacticalMoves.contains(m));
         }
     }
     else {
@@ -104,13 +101,13 @@ void movegen_mode_invariants(Position& pos, int depth) {  // NOLINT(misc-no-recu
         for (const Move m : legalMoves) {
             if (m.isCapture() || m.isPromotion()) {
                 ++tacticalCount;
-                CHECK(contains_move(tacticalMoves, m));
+                CHECK(tacticalMoves.contains(m));
             }
         }
 
         for (const Move m : tacticalMoves) {
             CHECK((m.isCapture() || m.isPromotion()));
-            CHECK(contains_move(legalMoves, m));
+            CHECK(legalMoves.contains(m));
         }
 
         CHECK(tacticalCount == tacticalMoves.size());
@@ -123,6 +120,7 @@ void movegen_mode_invariants(Position& pos, int depth) {  // NOLINT(misc-no-recu
         pos.undoMove(m, u);
     }
 }
+// NOLINTEND(misc-no-recursion)
 
 }  // namespace
 
@@ -228,7 +226,7 @@ TEST_CASE("Perft", "[perft][movegen]") {
 struct InvariantCase {
     const char* name;
     const char* fen;
-    int depth;
+    Depth depth;
 };
 
 // Tests that the position invariants hold at each node of the search tree up to the given depth.

@@ -21,7 +21,7 @@ cmake --build build -j
 #### Engine
 To build and run the engine, use:
 ```bash
-cmake --build build --target run -- -j
+cmake --build build --target run
 ```
 
 #### Formatter/Linter
