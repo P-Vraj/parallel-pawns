@@ -48,7 +48,7 @@ private:
 
     std::vector<UCIOption> options_;
     Position position_{};
-    std::vector<Key> positionHistory_{};
+    std::vector<Key> positionHistory_;
     TranspositionTable tt_{static_cast<size_t>(kDefaultHashMb)};
     SearchLimits searchLimits_{kDefaultDepth, kDefaultThreads};
     SearchSharedState sharedSearchState_{};

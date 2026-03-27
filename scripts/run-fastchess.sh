@@ -9,12 +9,12 @@ BOOK_PATH="${BOOK_PATH:-${ROOT_DIR}/data/openings/UHO_Lichess_4852_v1.epd}"
 OUTPUT_DIR="${OUTPUT_DIR:-${ROOT_DIR}/scripts/fastchess_logs}"
 RUN_DIR="${OUTPUT_DIR}/$(date +%Y-%m-%d-%H-%M-%S)"
 
-ENGINE_A="${ENGINE_A:-name=SingleThread cmd=${ENGINE_CMD} option.Threads=1 option.Hash=1024}"
-ENGINE_B="${ENGINE_B:-name=MultiThread cmd=${ENGINE_CMD} option.Threads=4 option.Hash=1024}"
+ENGINE_A="${ENGINE_A:-name=Contender cmd=${ENGINE_CMD} option.Threads=4 option.Hash=1024}"
+ENGINE_B="${ENGINE_B:-name=Baseline cmd=${ENGINE_CMD} option.Threads=1 option.Hash=1024}"
 
 TIME_CONTROL="${TIME_CONTROL:-0:10+0.1}"
-ROUNDS="${ROUNDS:-1}"
-CONCURRENCY="${CONCURRENCY:-1}"
+ROUNDS="${ROUNDS:-100}"
+CONCURRENCY="${CONCURRENCY:-4}"
 BOOK_PLIES="${BOOK_PLIES:-10}"
 WRITE_LOGS="${WRITE_LOGS:-0}"
 

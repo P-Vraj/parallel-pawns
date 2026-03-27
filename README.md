@@ -19,7 +19,7 @@
 ### Build Instructions
 First, configure the project using CMake (defaults to a "Release" build, with "Debug" optional) and build it with:
 ```bash
-cmake -S . -B build [-DCMAKE_BUILD_TYPE=Debug]
+cmake -S . -B build [-DCMAKE_BUILD_TYPE=Release|Debug]
 cmake --build build -j
 ```
 
@@ -48,19 +48,19 @@ Or to run a single test, such as "Perft", use:
 ctest --test-dir build -R "Perft" --output-on-failure
 ```
 
-#### Benchmarks
-To benchmark engine-vs-engine performance through real games, run the script:
-```bash
-sh ./scripts/run-fastchess.sh
-```
-To enable further logging, run:
-```bash
-WRITE_LOGS=1 sh ./scripts/run-fastchess.sh
-```
-This utilizes the Fastchess CLI to run games against engines, allowing for benchmarking and statistical analyses. Update the options by passing them through the command line or by modifying the script. View `./scripts/run-fastshess.sh` for more details.
-
-*Note*: Must have [Fastchess](https://github.com/Disservin/fastchess) installed.
-
 #### Miscellaneous
 You can find tool-specific build instructions within the files in `tools/`.
 You can find script-specific run instructions within the files in `scripts/`.
+
+### Benchmarks
+To benchmark engine-vs-engine performance through real games, run the script:
+```bash
+bash ./scripts/run-fastchess.sh
+```
+To enable further logging, run:
+```bash
+WRITE_LOGS=1 bash ./scripts/run-fastchess.sh
+```
+This utilizes the Fastchess CLI to run games against engines, allowing for benchmarking and statistical analyses. Update the options by passing them through the command line or by modifying the script.
+
+*Note*: Must have [Fastchess](https://github.com/Disservin/fastchess) and an opening book installed. View [`./scripts/run-fastchess.sh`](./scripts/run-fastchess.sh) and [`./data/openings/README.md`](./data/openings/README.md) for more details.

@@ -80,21 +80,25 @@ void init_geometry_tables() noexcept;
 
 // Returns bitboard of squares strictly between a and b (excluding a and b), or 0 if a and b are not aligned.
 inline Bitboard between(Square a, Square b) noexcept {
+    assert(is_valid(a) && is_valid(b));
     return between_table[to_underlying(a)][to_underlying(b)];
 }
 
 // Returns bitboard of squares between a and b (including b), or 0 if a and b are not aligned.
 inline Bitboard between_or_to(Square a, Square b) noexcept {
+    assert(is_valid(a) && is_valid(b));
     return between_table[to_underlying(a)][to_underlying(b)] | bitboard(b);
 }
 
 // Returns bitboard of squares on the full line with a to b (including a and b), or 0 if a and b are not aligned.
 inline Bitboard line(Square a, Square b) noexcept {
+    assert(is_valid(a) && is_valid(b));
     return line_table[to_underlying(a)][to_underlying(b)];
 }
 
 // Returns bitboard of squares on the ray from a past b, or 0 if a and b are not aligned.
 inline Bitboard ray_pass(Square a, Square b) noexcept {
+    assert(is_valid(a) && is_valid(b));
     return ray_pass_table[to_underlying(a)][to_underlying(b)];
 }
 
