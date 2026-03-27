@@ -1,5 +1,7 @@
 #pragma once
 
+#include <atomic>
+#include <optional>
 #include <vector>
 
 #include "types.h"
@@ -23,6 +25,15 @@ struct TTEntry {
 };
 static_assert(sizeof(TTEntry) == 16);
 
+// A TTEntry is packed into 128 bits as follows:
+// Bits 0-63:       Hash key
+// Bits 64-79:      Score
+// Bits 80-95:      Best move
+// Bits 96-103:     Bound
+// Bits 104-111:    Depth
+// Bits 112-119:    Age
+using PackedTTEntry = __uint128_t;
+
 class TranspositionTable {
 public:
     TranspositionTable() noexcept = default;
@@ -33,7 +44,7 @@ public:
     bool empty() const noexcept { return size_ == 0; }
     void newSearch() noexcept { ++age_; }
 
-    const TTEntry* probe(Key key) const noexcept;
+    std::optional<TTEntry> probe(Key key) const noexcept;
     void store(Key key, Move move, TTScore score, uint8_t depth, Bound bound, int ply) noexcept;
 
     // Statistics
@@ -59,11 +70,14 @@ public:
 private:
     size_t index_(Key key) const noexcept { return key & (size_ - 1); }
 
-    std::vector<TTEntry> table_;
+    static TTEntry unpack_(PackedTTEntry packed) noexcept;
+    static PackedTTEntry pack_(Key key, TTScore score, Move bestMove, Bound bound, uint8_t depth, uint8_t age) noexcept;
+
+    std::vector<std::atomic<PackedTTEntry>> table_;
     size_t size_{};
-    uint8_t age_{};
-    mutable size_t hits_{};
-    mutable size_t misses_{};
-    mutable size_t writes_{};
-    mutable size_t rewrites_{};
+    std::atomic<uint8_t> age_{0};
+    mutable std::atomic<size_t> hits_{0};
+    mutable std::atomic<size_t> misses_{0};
+    mutable std::atomic<size_t> writes_{0};
+    mutable std::atomic<size_t> rewrites_{0};
 };

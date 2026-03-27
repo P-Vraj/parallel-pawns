@@ -5,11 +5,13 @@
 ### Requirements
 * Unix (preferably Linux) environment
 * C++23
-* Clang
+* Clang (v17+)
 * CMake (v3.20+)
 * Ccache
 * clang-format (optional)
 * clang-tidy (optional)
+
+*Note*: Requires a modern CPU and OS that supports lock-free 128-bit atomic operations. Most recent x86_64 and ARM64 systems with up-to-date compilers will meet this requirement.
 
 ### Build Instructions
 First, configure the project using CMake (defaults to a "Release" build, with "Debug" optional) and build it with:

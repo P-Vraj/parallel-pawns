@@ -30,14 +30,12 @@ namespace engine {
 SearchResult Search::search(Position& pos, const SearchLimits& limits) {
     nodes_ = 0;
     qNodes_ = 0;
+    aborted_ = false;
     resetHeuristics_();
     pvLength_.fill(0);
     for (auto& pvLine : pvTable_) {
         pvLine.fill(Move::none());
     }
-
-    if (tt_ != nullptr)
-        tt_->newSearch();
 
     SearchResult result{};
 
@@ -54,34 +52,54 @@ SearchResult Search::search(Position& pos, const SearchLimits& limits) {
         }
     }
 
-    Move bestMove{};
-    Eval bestScore = -kEvalInf;
+    Move bestMove = moves.empty() ? Move{} : moves[0];
+    Eval bestScore = evaluate_(pos);
+    const Depth targetDepth = limits.infinite ? (kMaxPly - 1) : limits.depth;
+    bool softStopped = false;
 
-    for (int currentDepth = 1; currentDepth <= limits.depth; ++currentDepth) {
+    for (Depth currentDepth = 1; currentDepth <= targetDepth; ++currentDepth) {
+        if (shouldStopHard_() || shouldStopSoft_()) {
+            softStopped = softStopped || !aborted_;
+            break;
+        }
+
         pvLength_[0] = 0;
         Move ttMove = bestMove;
         if (tt_ != nullptr) {
-            if (const TTEntry* entry = tt_->probe(pos.hash())) {
-                if (!entry->bestMove.isNone())
-                    ttMove = entry->bestMove;
+            if (const auto hit = tt_->probe(pos.hash())) {
+                const TTEntry& entry = *hit;
+                if (!entry.bestMove.isNone())
+                    ttMove = entry.bestMove;
             }
         }
 
         orderMoves_(pos, moves, ttMove, 0);
+        diversifyRootMoves_(moves);
 
         Eval alpha = -kEvalInf;
         const Eval beta = kEvalInf;
 
         Eval iterationBestScore = -kEvalInf;
         Move iterationBestMove{};
+        bool iterationAborted = false;
 
         for (const Move m : moves) {
+            if (shouldStopHard_()) {
+                iterationAborted = true;
+                break;
+            }
+
             UndoInfo u{};
             pos.makeMove(m, u);
 
             const Eval score = -alphaBeta_(pos, currentDepth - 1, -beta, -alpha, 1);
 
             pos.undoMove(m, u);
+
+            if (aborted_) {
+                iterationAborted = true;
+                break;
+            }
 
             if (score > iterationBestScore) {
                 iterationBestScore = score;
@@ -100,22 +118,44 @@ SearchResult Search::search(Position& pos, const SearchLimits& limits) {
             alpha = std::max(alpha, score);
         }
 
+        if (iterationAborted)
+            break;
+
         bestMove = iterationBestMove;
         bestScore = iterationBestScore;
+        result.score = bestScore;
+        result.bestMove = bestMove;
+        result.completedDepth = currentDepth;
+        result.pvLength = pvLength_[0];
+        for (uint8_t i = 0; i < result.pvLength; ++i) {
+            result.pv[i] = pvTable_[0][i];
+        }
+
+        if (shouldStopSoft_()) {
+            softStopped = true;
+            break;
+        }
     }
 
-    result.bestMove = bestMove;
-    result.score = bestScore;
+    if (result.completedDepth == 0) {
+        result.bestMove = bestMove;
+        result.score = bestScore;
+        if (!bestMove.isNone()) {
+            result.pv[0] = bestMove;
+            result.pvLength = 1;
+        }
+    }
+
     result.nodes = nodes_;
     result.qNodes = qNodes_;
-    result.pvLength = pvLength_[0];
-    for (uint8_t i = 0; i < result.pvLength; ++i) {
-        result.pv[i] = pvTable_[0][i];
-    }
+    result.stopped = aborted_ || softStopped;
     return result;
 }
 
 Eval Search::alphaBeta_(Position& pos, Depth depth, Eval alpha, Eval beta, int ply) {
+    if (shouldStopHard_())
+        return 0;
+
     ++nodes_;
 
     if (ply < kMaxPly)
@@ -138,13 +178,13 @@ Eval Search::alphaBeta_(Position& pos, Depth depth, Eval alpha, Eval beta, int p
     Move ttMove{};
 
     if (tt_ != nullptr) {
-        if (const TTEntry* entry = tt_->probe(key)) {
-            ttMove = entry->bestMove;
-            const Eval ttScore = decode_mate_score(unpack_TTScore(entry->score), ply);
+        if (const auto hit = tt_->probe(key)) {
+            const TTEntry& entry = *hit;
+            const Eval ttScore = decode_mate_score(unpack_TTScore(entry.score), ply);
 
-            const auto entryDepth = static_cast<Depth>(entry->depth);
+            const auto entryDepth = static_cast<Depth>(entry.depth);
             if (entryDepth >= depth) {
-                switch (entry->bound) {
+                switch (entry.bound) {
                     case Bound::Exact:
                         return ttScore;
                     case Bound::Lower:
@@ -160,6 +200,8 @@ Eval Search::alphaBeta_(Position& pos, Depth depth, Eval alpha, Eval beta, int p
                         break;
                 }
             }
+
+            ttMove = entry.bestMove;
         }
     }
 
@@ -169,12 +211,18 @@ Eval Search::alphaBeta_(Position& pos, Depth depth, Eval alpha, Eval beta, int p
     Move bestMove{};
 
     for (const Move m : moves) {
+        if (shouldStopHard_())
+            return 0;
+
         UndoInfo u{};
         pos.makeMove(m, u);
 
         const Eval score = -alphaBeta_(pos, depth - 1, -beta, -alpha, ply + 1);
 
         pos.undoMove(m, u);
+
+        if (aborted_)
+            return 0;
 
         if (score > bestScore) {
             bestScore = score;
@@ -199,7 +247,7 @@ Eval Search::alphaBeta_(Position& pos, Depth depth, Eval alpha, Eval beta, int p
         }
     }
 
-    if (tt_ != nullptr) {
+    if (tt_ != nullptr && !aborted_) {
         Bound bound = Bound::Exact;
         if (bestScore <= originalAlpha)
             bound = Bound::Upper;
@@ -213,6 +261,9 @@ Eval Search::alphaBeta_(Position& pos, Depth depth, Eval alpha, Eval beta, int p
 }
 
 Eval Search::quiescence_(Position& pos, Eval alpha, Eval beta, int ply) {
+    if (shouldStopHard_())
+        return 0;
+
     ++qNodes_;
 
     if (ply < kMaxPly)
@@ -241,6 +292,9 @@ Eval Search::quiescence_(Position& pos, Eval alpha, Eval beta, int ply) {
     orderQMoves_(pos, moves, inCheck);
 
     for (const Move m : moves) {
+        if (shouldStopHard_())
+            return 0;
+
         if (!inCheck) {
             const Eval optimisticScore = standPat + qsearch_gain(pos, m) + kQSearchDeltaMargin;
             if (optimisticScore < alpha)
@@ -256,6 +310,9 @@ Eval Search::quiescence_(Position& pos, Eval alpha, Eval beta, int ply) {
         const Eval score = -quiescence_(pos, -beta, -alpha, ply + 1);
 
         pos.undoMove(m, u);
+
+        if (aborted_)
+            return 0;
 
         if (score >= beta) {
             pvTable_[ply][ply] = m;
@@ -318,6 +375,44 @@ void Search::orderMoves_(const Position& pos, MoveList& moves, Move ttMove, int 
     std::ranges::sort(moves, [&](Move lhs, Move rhs) {
         return scoreMove_(pos, lhs, ttMove, ply) > scoreMove_(pos, rhs, ttMove, ply);
     });
+}
+
+bool Search::shouldStopHard_() noexcept {
+    if (aborted_)
+        return true;
+
+    if (sharedState_ == nullptr)
+        return false;
+
+    // Only check shared state occasionally to avoid overhead of atomics
+    const uint64_t totalNodes = nodes_ + qNodes_;
+    if (totalNodes != 0 && totalNodes % 1024 != 0)
+        return false;
+
+    const bool stopRequested = sharedState_->stopRequested.load(std::memory_order_relaxed);
+    const bool deadlineReached =
+        sharedState_->hardDeadline.has_value() && std::chrono::steady_clock::now() >= *sharedState_->hardDeadline;
+
+    aborted_ = stopRequested || deadlineReached;
+    return aborted_;
+}
+
+bool Search::shouldStopSoft_() const noexcept {
+    if (sharedState_ == nullptr || !sharedState_->softDeadline.has_value())
+        return false;
+
+    return std::chrono::steady_clock::now() >= *sharedState_->softDeadline;
+}
+
+void Search::diversifyRootMoves_(MoveList& moves) const noexcept {
+    if (workerId_ <= 0 || moves.size() < 2)
+        return;
+
+    const auto shift = static_cast<uint8_t>(workerId_ % moves.size());
+    if (shift == 0)
+        return;
+
+    std::ranges::rotate(moves, moves.begin() + shift);
 }
 
 int Search::scoreMove_(const Position& pos, Move move, Move ttMove, int ply) const noexcept {
