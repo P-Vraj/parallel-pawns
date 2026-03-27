@@ -1,14 +1,8 @@
 #pragma once
 
-#include <algorithm>
-#include <bit>
-#include <memory>
 #include <vector>
 
-#include "eval_constants.h"
-#include "position.h"
 #include "types.h"
-#include "zobrist.h"
 
 enum class Bound : uint8_t {
     None,
@@ -38,7 +32,7 @@ public:
     size_t size() const noexcept { return size_; }
     bool empty() const noexcept { return size_ == 0; }
     void newSearch() noexcept { ++age_; }
-    
+
     const TTEntry* probe(Key key) const noexcept;
     void store(Key key, Move move, TTScore score, uint8_t depth, Bound bound, int ply) noexcept;
 

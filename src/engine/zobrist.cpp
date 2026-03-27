@@ -8,6 +8,7 @@ std::array<Key, 8> enPassantFile;
 Key side;
 
 namespace {
+
 // Using the SplitMix64 algorithm as a PRNG for generating the random numbers for the Zobrist keys
 // Learn more here: https://prng.di.unimi.it/splitmix64.c
 inline Key prng(uint64_t& state) noexcept {
@@ -16,6 +17,7 @@ inline Key prng(uint64_t& state) noexcept {
     k = (k ^ (k >> 27)) * 0x94D049BB133111EBULL;
     return static_cast<Key>(k ^ (k >> 31));
 }
+
 }  // namespace
 
 void init_zobrist(uint64_t seed) noexcept {

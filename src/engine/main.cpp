@@ -6,7 +6,7 @@ int main() {
         uci.loop();
     }
     catch (const std::exception& e) {
-        std::cerr << "Error in main: " << e.what() << "\n";
+        std::cerr << "Error: " << e.what() << "\n";
         return EXIT_FAILURE;
     }
 

@@ -6,9 +6,9 @@
 #include <random>
 #include <span>
 
-#include "../src/engine/move_gen/attacks_sliders.h"
-#include "../src/engine/types.h"
-#include "../src/engine/util.h"
+#include "move_gen/attacks_sliders.h"
+#include "types.h"
+#include "util.h"
 
 namespace {
 

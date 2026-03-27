@@ -49,6 +49,8 @@ std::string UCIOption::uciDeclaration() const {
         case OptionType::String:
             out += std::format(" type string default {}", to_string(value_));
             break;
+        default:
+            break;
     }
     return out;
 }
@@ -84,6 +86,8 @@ bool UCIOption::setValue(std::string_view rawValue) {
             value_ = std::string(rawValue);
             return true;
         }
+        default:
+            break;
     }
 
     return false;

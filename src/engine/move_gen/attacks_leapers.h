@@ -13,7 +13,7 @@ constexpr std::array<Bitboard, 64> generate_non_sliding_attacks_table(std::span<
         for (const auto& [dr, df] : deltas) {
             const File f = file(sq) + df;
             const Rank r = rank(sq) + dr;
-            if (is_valid(f, r)) {
+            if (is_valid(f) && is_valid(r)) {
                 attacksBitboard |= bitboard(make_square(f, r));
             }
         }

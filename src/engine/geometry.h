@@ -33,6 +33,7 @@ constexpr size_t direction_index(Direction dir) noexcept {
             return 8;  // Invalid direction index
     }
 }
+
 constexpr std::array<std::array<Square, 8>, 64> make_step_table() noexcept {
     std::array<std::array<Square, 8>, 64> stepTable{};
 
@@ -64,6 +65,7 @@ constexpr std::array<std::array<Square, 8>, 64> make_step_table() noexcept {
 }
 
 inline constexpr std::array<std::array<Square, 8>, 64> kStepTable = make_step_table();
+
 // Steps from the given square in the given direction, or returns Square::None if stepping goes off the board.
 constexpr Square step(Square sq, Direction dir) noexcept {
     return kStepTable[to_underlying(sq)][direction_index(dir)];
@@ -72,20 +74,25 @@ constexpr Square step(Square sq, Direction dir) noexcept {
 extern std::array<std::array<Bitboard, 64>, 64> line_table;
 extern std::array<std::array<Bitboard, 64>, 64> between_table;
 extern std::array<std::array<Bitboard, 64>, 64> ray_pass_table;
+
 // Initializes the line, between, and ray_pass tables.
 void init_geometry_tables() noexcept;
+
 // Returns bitboard of squares strictly between a and b (excluding a and b), or 0 if a and b are not aligned.
 inline Bitboard between(Square a, Square b) noexcept {
     return between_table[to_underlying(a)][to_underlying(b)];
 }
+
 // Returns bitboard of squares between a and b (including b), or 0 if a and b are not aligned.
 inline Bitboard between_or_to(Square a, Square b) noexcept {
     return between_table[to_underlying(a)][to_underlying(b)] | bitboard(b);
 }
+
 // Returns bitboard of squares on the full line with a to b (including a and b), or 0 if a and b are not aligned.
 inline Bitboard line(Square a, Square b) noexcept {
     return line_table[to_underlying(a)][to_underlying(b)];
 }
+
 // Returns bitboard of squares on the ray from a past b, or 0 if a and b are not aligned.
 inline Bitboard ray_pass(Square a, Square b) noexcept {
     return ray_pass_table[to_underlying(a)][to_underlying(b)];

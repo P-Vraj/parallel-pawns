@@ -6,29 +6,6 @@ constexpr bool includes_quiets(GenMode mode) noexcept {
     return mode == GenMode::Legal || mode == GenMode::Evasions;
 }
 
-void push_simple_moves(Square from, Bitboard targets, Bitboard themOcc, MoveList& moveList) noexcept {
-    while (targets) {
-        const auto to = static_cast<Square>(pop_lsb(targets));
-        const MoveType moveType = (themOcc & bitboard(to)) ? MoveType::Capture : MoveType::Normal;
-        moveList.push_back(Move(from, to, moveType));
-    }
-}
-
-void push_promotions(Square from, Square to, bool isCapture, MoveList& moveList) noexcept {
-    if (!isCapture) {
-        moveList.push_back(Move(from, to, MoveType::PromotionQueen));
-        moveList.push_back(Move(from, to, MoveType::PromotionRook));
-        moveList.push_back(Move(from, to, MoveType::PromotionBishop));
-        moveList.push_back(Move(from, to, MoveType::PromotionKnight));
-    }
-    else {
-        moveList.push_back(Move(from, to, MoveType::PromotionCaptureQueen));
-        moveList.push_back(Move(from, to, MoveType::PromotionCaptureRook));
-        moveList.push_back(Move(from, to, MoveType::PromotionCaptureBishop));
-        moveList.push_back(Move(from, to, MoveType::PromotionCaptureKnight));
-    }
-}
-
 // Generates the evasion mask for a king in check by a single piece.
 Bitboard evasion_mask(const Position& pos, Square kingSq, Bitboard checkers) noexcept {
     const auto checkerSq = static_cast<Square>(get_lsb(checkers));
@@ -41,6 +18,50 @@ Bitboard evasion_mask(const Position& pos, Square kingSq, Bitboard checkers) noe
         mask |= geom::between(kingSq, checkerSq);
 
     return mask;
+}
+
+struct PinsInfo {
+    std::array<Bitboard, 64> pinRay{};  // Allowed destinations if pinned; ~0 if not pinned
+    Bitboard pinned = 0;
+};
+
+// Computes pinned pieces and their corresponding pin rays for the given position and side to move.
+PinsInfo compute_pins(const Position& pos, Color us) noexcept {
+    PinsInfo pins;
+    pins.pinRay.fill(~Bitboard{0});
+
+    const Square kingSq = pos.kingSquare(us);
+
+    auto scan_direction = [&](Direction dir) noexcept {
+        Square candidate = Square::None;
+        for (Square sq = geom::step(kingSq, dir); is_valid(sq); sq = geom::step(sq, dir)) {
+            const Piece p = pos.pieceOn(sq);
+            if (is_empty(p))
+                continue;
+
+            // Check if the piece is a friendly piece blocking the pin
+            if (color(p) == us) {
+                if (!is_valid(candidate)) {
+                    candidate = sq;
+                    continue;
+                }
+                return;
+            }
+            // If enemy piece found that slides in this direction, it's a pin
+            if (is_valid(candidate) && is_slider_for_direction(piece_type(p), dir)) {
+                pins.pinned |= bitboard(candidate);
+                // Build ray from king to pinner
+                pins.pinRay[to_underlying(candidate)] = geom::between_or_to(kingSq, sq);
+            }
+            return;
+        }
+    };
+
+    for (const Direction dir : geom::kDirections) {
+        scan_direction(dir);
+    }
+
+    return pins;
 }
 
 // Holds state relevant to move generation, to avoid redundant accesses/computations during move generation.
@@ -91,6 +112,14 @@ void generate_king_moves(const Position& pos, const State& state, MoveList& move
     }
 }
 
+void push_simple_moves(Square from, Bitboard targets, Bitboard themOcc, MoveList& moveList) noexcept {
+    while (targets) {
+        const auto to = static_cast<Square>(pop_lsb(targets));
+        const MoveType moveType = (themOcc & bitboard(to)) ? MoveType::Capture : MoveType::Normal;
+        moveList.push_back(Move(from, to, moveType));
+    }
+}
+
 template <PieceType PT>
 void generate_piece_moves(const Position& pos, const State& state, MoveList& moveList, GenMode mode) {
     Bitboard pieces = pos.get(state.us, PT);
@@ -103,6 +132,21 @@ void generate_piece_moves(const Position& pos, const State& state, MoveList& mov
             targets &= state.themOcc;
 
         push_simple_moves(from, targets, state.themOcc, moveList);
+    }
+}
+
+void push_promotions(Square from, Square to, bool isCapture, MoveList& moveList) noexcept {
+    if (!isCapture) {
+        moveList.push_back(Move(from, to, MoveType::PromotionQueen));
+        moveList.push_back(Move(from, to, MoveType::PromotionRook));
+        moveList.push_back(Move(from, to, MoveType::PromotionBishop));
+        moveList.push_back(Move(from, to, MoveType::PromotionKnight));
+    }
+    else {
+        moveList.push_back(Move(from, to, MoveType::PromotionCaptureQueen));
+        moveList.push_back(Move(from, to, MoveType::PromotionCaptureRook));
+        moveList.push_back(Move(from, to, MoveType::PromotionCaptureBishop));
+        moveList.push_back(Move(from, to, MoveType::PromotionCaptureKnight));
     }
 }
 
@@ -240,8 +284,7 @@ void generate_castling_moves(const Position& pos, const State& state, MoveList& 
     }
 }
 
-void generate_en_passant_moves(const Position& pos, const State& state, MoveList& moveList, GenMode mode) noexcept {
-    (void)mode;
+void generate_en_passant_moves(const Position& pos, const State& state, MoveList& moveList) noexcept {
     const Square epSq = pos.epSquare();
     if (!is_valid(epSq))
         return;
@@ -302,44 +345,6 @@ bool is_any_square_attacked(const Position& pos, Bitboard b, Color by) noexcept 
     return false;
 }
 
-PinsInfo compute_pins(const Position& pos, Color us) noexcept {
-    PinsInfo pins;
-    pins.pinRay.fill(~Bitboard{0});
-
-    const Square kingSq = pos.kingSquare(us);
-
-    auto scan_direction = [&](Direction dir) noexcept {
-        Square candidate = Square::None;
-        for (Square sq = geom::step(kingSq, dir); is_valid(sq); sq = geom::step(sq, dir)) {
-            const Piece p = pos.pieceOn(sq);
-            if (is_empty(p))
-                continue;
-
-            // Check if the piece is a friendly piece blocking the pin
-            if (color(p) == us) {
-                if (!is_valid(candidate)) {
-                    candidate = sq;
-                    continue;
-                }
-                return;
-            }
-            // If enemy piece found that slides in this direction, it's a pin
-            if (is_valid(candidate) && is_slider_for_direction(piece_type(p), dir)) {
-                pins.pinned |= bitboard(candidate);
-                // Build ray from king to pinner
-                pins.pinRay[to_underlying(candidate)] = geom::between_or_to(kingSq, sq);
-            }
-            return;
-        }
-    };
-
-    for (const Direction dir : geom::kDirections) {
-        scan_direction(dir);
-    }
-
-    return pins;
-}
-
 void generate_moves(const Position& pos, MoveList& moveList, GenMode mode) noexcept {
     moveList.clear();
     const State state = init_state(pos);
@@ -358,5 +363,5 @@ void generate_moves(const Position& pos, MoveList& moveList, GenMode mode) noexc
     generate_pawn_moves(pos, state, moveList, effectiveMode);
 
     generate_castling_moves(pos, state, moveList, effectiveMode);
-    generate_en_passant_moves(pos, state, moveList, effectiveMode);
+    generate_en_passant_moves(pos, state, moveList);
 }

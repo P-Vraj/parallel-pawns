@@ -20,6 +20,8 @@ enum class OptionType : uint8_t {
     Check,   // bool
     Spin,    // int
     String,  // string
+
+    Count = 3
 };
 
 struct UCIOption {

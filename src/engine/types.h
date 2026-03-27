@@ -12,6 +12,12 @@ using Eval = int;
 using Depth = int;
 using TTScore = int16_t;
 
+template <typename T>
+    requires std::is_enum_v<T>
+constexpr bool is_valid(T type) noexcept {
+    return to_underlying(type) < to_underlying(T::Count);
+}
+
 // clang-format off
 enum class Square : uint8_t {
     A1, B1, C1, D1, E1, F1, G1, H1,
@@ -26,18 +32,16 @@ enum class Square : uint8_t {
 
     Count = 64
 };
-// clang-format on
 
-// clang-format off
 enum class Direction : int8_t {
     North     = +8,
-    South     = -8,
     East      = +1,
-    West      = -1,
-    NorthEast = +9,
-    NorthWest = +7,
-    SouthEast = -7,
-    SouthWest = -9,
+    South     = -North,
+    West      = -East,
+    NorthEast = North + East,
+    NorthWest = North + West,
+    SouthEast = South + East,
+    SouthWest = South + West,
 
     Count = 8,
 };
@@ -71,10 +75,6 @@ constexpr Square& operator--(Square& sq) noexcept {
     return sq = static_cast<Square>(to_underlying(sq) - 1);
 }
 
-constexpr bool is_valid(Square sq) noexcept {
-    return to_underlying(sq) < to_underlying(Square::Count);
-}
-
 enum class File : uint8_t {
     A,
     B,
@@ -91,10 +91,6 @@ enum class File : uint8_t {
 constexpr File file(Square sq) noexcept {
     assert(is_valid(sq));
     return File(to_underlying(sq) % 8);
-}
-
-constexpr bool is_valid(File f) noexcept {
-    return to_underlying(f) < to_underlying(File::Count);
 }
 
 constexpr File& operator+=(File& f, int rhs) noexcept {
@@ -148,10 +144,6 @@ constexpr Rank rank(Square sq) noexcept {
     return Rank(to_underlying(sq) / 8);
 }
 
-constexpr bool is_valid(Rank r) noexcept {
-    return to_underlying(r) < to_underlying(Rank::Count);
-}
-
 constexpr Rank& operator+=(Rank& r, int rhs) noexcept {
     r = static_cast<Rank>(static_cast<int>(to_underlying(r)) + rhs);
     return r;
@@ -185,11 +177,8 @@ constexpr Rank& operator--(Rank& r) noexcept {
 }
 
 constexpr Square make_square(File f, Rank r) noexcept {
+    assert(is_valid(f) && is_valid(r));
     return Square(to_underlying(f) | (to_underlying(r) << 3));
-}
-
-constexpr bool is_valid(File f, Rank r) noexcept {
-    return is_valid(f) && is_valid(r);
 }
 
 constexpr Bitboard bitboard(Square sq) noexcept {
@@ -284,23 +273,32 @@ enum class CastlingRights : uint8_t {
 // clang-format on
 
 // NOLINTBEGIN(clang-analyzer-optin.core.EnumCastOutOfRange): Disable linting as CastlingRights is used as a bitfield
+constexpr bool is_valid(CastlingRights rights) noexcept {
+    return to_underlying(rights) <= to_underlying(CastlingRights::All);
+}
+
 constexpr CastlingRights operator|(CastlingRights a, CastlingRights b) noexcept {
+    assert(is_valid(a) && is_valid(b));
     return static_cast<CastlingRights>(static_cast<uint8_t>(a) | static_cast<uint8_t>(b));
 }
 
 constexpr CastlingRights operator&(CastlingRights a, CastlingRights b) noexcept {
+    assert(is_valid(a) && is_valid(b));
     return static_cast<CastlingRights>(static_cast<uint8_t>(a) & static_cast<uint8_t>(b));
 }
 
 constexpr CastlingRights& operator|=(CastlingRights& a, CastlingRights b) noexcept {
+    assert(is_valid(a) && is_valid(b));
     return a = a | b;
 }
 
 constexpr CastlingRights& operator&=(CastlingRights& a, CastlingRights b) noexcept {
+    assert(is_valid(a) && is_valid(b));
     return a = a & b;
 }
 
 constexpr bool has_right(CastlingRights rights, CastlingRights flag) noexcept {
+    assert(is_valid(rights) && is_valid(flag));
     return (rights & flag) != CastlingRights::None;
 }
 // NOLINTEND(clang-analyzer-optin.core.EnumCastOutOfRange)
@@ -328,6 +326,10 @@ enum class MoveType : uint8_t {
 };
 // clang-format on
 
+constexpr bool is_valid(MoveType moveType) noexcept {
+    return to_underlying(moveType) <= to_underlying(MoveType::PromotionCaptureQueen);
+};
+
 struct Move {
     // A move is packed into 16 bits as follows:
     // Bits 0-5:    From square
@@ -336,7 +338,6 @@ struct Move {
 
     constexpr Move() noexcept : data_(0) {}
     constexpr explicit Move(uint16_t data) noexcept : data_(data) {}
-    constexpr Move(Square from, Square to) noexcept : data_(to_underlying(from) | (to_underlying(to) << 6)) {}
     constexpr Move(Square from, Square to, MoveType moveType) noexcept
         : data_(to_underlying(from) | (to_underlying(to) << 6) | (to_underlying(moveType) << 12)) {}
 

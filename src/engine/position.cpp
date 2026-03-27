@@ -9,6 +9,7 @@
 #include "zobrist.h"
 
 namespace {
+
 constexpr std::array<uint8_t, 64> make_castle_mask() {
     std::array<uint8_t, 64> mask{};
     mask.fill(to_underlying(CastlingRights::All));
@@ -25,6 +26,7 @@ constexpr std::array<uint8_t, 64> make_castle_mask() {
 }
 
 constexpr std::array<uint8_t, 64> kCastleMask = make_castle_mask();
+
 }  // namespace
 
 Position Position::fromFEN(std::string_view fen) {

@@ -3,7 +3,8 @@
 #include <algorithm>
 #include <bit>
 #include <memory>
-#include <vector>
+
+#include "eval_constants.h"
 
 void TranspositionTable::resize(size_t sizeMB) {
     // Round size down to nearest power of two for efficient indexing

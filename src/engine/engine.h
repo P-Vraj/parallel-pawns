@@ -1,5 +1,4 @@
 #pragma once
-#include <unordered_map>
 #include <vector>
 
 #include "geometry.h"
@@ -12,7 +11,7 @@
 
 namespace engine {
 
-constexpr std::string_view startpos = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
+inline constexpr std::string_view startpos = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
 
 static std::once_flag initFlag;
 inline void init_engine() noexcept {

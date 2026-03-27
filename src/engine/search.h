@@ -3,6 +3,7 @@
 #include <array>
 #include <optional>
 
+#include "eval_constants.h"
 #include "move_gen/generator.h"
 #include "position.h"
 #include "transposition_table.h"
