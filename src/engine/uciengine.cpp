@@ -77,8 +77,8 @@ void UCIEngine::loop() {
         }
         else if (command == "position") {
             std::string fen{startpos};
-            size_t fenIt = line.find("fen");
-            size_t movesIt = line.find("moves");
+            const size_t fenIt = line.find("fen");
+            const size_t movesIt = line.find("moves");
             if (fenIt != std::string::npos) {
                 fen = line.substr(fenIt + 4, movesIt - fenIt - 4);
                 trim(fen);
@@ -87,7 +87,7 @@ void UCIEngine::loop() {
 
             if (movesIt == std::string::npos)
                 continue;
-            iss.seekg(movesIt + 6);
+            iss.seekg(static_cast<std::streamoff>(movesIt + 6));
 
             for (std::string uciMove; iss >> uciMove;) {
                 MoveList moveList(engine_.position_);

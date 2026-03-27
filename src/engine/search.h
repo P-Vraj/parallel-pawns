@@ -1,5 +1,6 @@
 #pragma once
 
+#include <array>
 #include <optional>
 
 #include "move_gen/generator.h"
@@ -19,12 +20,13 @@ struct SearchLimits {
 };
 
 struct SearchResult {
-    uint64_t nodes{};   // Number of nodes searched
-    uint64_t qNodes{};  // Number of quiescence nodes searched
-    Eval score{};       // Relative evaluation of the position
-    Move bestMove;      // Best move found in the search, or `Move::none()` if no move found
+    uint64_t nodes{};                // Number of nodes searched
+    uint64_t qNodes{};               // Number of quiescence nodes searched
+    Eval score{};                    // Relative evaluation of the position
+    Move bestMove;                   // Best move found in the search, or `Move::none()` if no move found
+    std::array<Move, kMaxPly> pv{};  // Principal variation from the root
+    uint8_t pvLength{};              // Number of moves in `pv`
 };
-static_assert(sizeof(SearchResult) == 24);
 
 class Search {
 public:
@@ -50,6 +52,8 @@ private:
     TranspositionTable* tt_{nullptr};
     uint64_t nodes_{};
     uint64_t qNodes_{};
+    std::array<std::array<Move, kMaxPly>, kMaxPly> pvTable_{};
+    std::array<uint8_t, kMaxPly> pvLength_{};
     std::array<std::array<Move, 2>, kMaxPly> killers_{};
     std::array<std::array<std::array<int, 64>, 64>, to_underlying(Color::Count)> history_{};
 };

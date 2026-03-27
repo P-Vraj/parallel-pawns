@@ -23,22 +23,25 @@ enum class OptionType : uint8_t {
 };
 
 struct UCIOption {
-    std::string name;
-    std::string key;
-    OptionType type;
-    OptionValue value;
-    std::optional<int> min;
-    std::optional<int> max;
-
-    static UCIOption check(std::string name, bool defaultValue);
-    static UCIOption spin(std::string name, int defaultValue, int minValue, int maxValue);
-    static UCIOption string(std::string name, std::string defaultValue);
+    static UCIOption check(std::string_view name, bool defaultValue);
+    static UCIOption spin(std::string_view name, int defaultValue, int minValue, int maxValue);
+    static UCIOption string(std::string_view name, std::string defaultValue);
 
     std::string uciDeclaration() const;
     bool setValue(std::string_view rawValue);
-
     template <typename T>
-    const T& getValue() const noexcept {
-        return std::get<T>(value);
+    const T& getValue() const {
+        return std::get<T>(value_);
     }
+
+    std::string name() const { return name_; }
+    std::string key() const { return key_; }
+
+private:
+    std::string name_;
+    std::string key_;
+    OptionType type_{OptionType::Check};
+    OptionValue value_;
+    std::optional<int> min_{std::nullopt};
+    std::optional<int> max_{std::nullopt};
 };

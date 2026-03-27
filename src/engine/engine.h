@@ -41,7 +41,7 @@ private:
     SearchLimits searchLimits_{static_cast<uint8_t>(kDefaultDepth)};
     Search search_{&tt_};
 
-    void setOption_(std::string name, std::string value);
+    void setOption_(std::string name, std::string_view value);
     const UCIOption& option_(std::string_view name) const;
     void applyOption_(const UCIOption& option);
     void setPosition_(std::string_view fen);

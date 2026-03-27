@@ -9,6 +9,33 @@
 
 namespace engine {
 
+namespace {
+
+int uciMateDistance(Eval score) noexcept {
+    const int matePly = kMateScore - std::abs(score);
+    const int mateMoves = (matePly + 1) / 2;
+    return score > 0 ? mateMoves : -mateMoves;
+}
+
+void printUciScore(Eval score) {
+    if (is_mate_score(score))
+        std::cout << "score mate " << uciMateDistance(score);
+    else
+        std::cout << "score cp " << score;
+}
+
+void printUciPV(const SearchResult& result) {
+    if (result.pvLength == 0)
+        return;
+
+    std::cout << " pv";
+    for (uint8_t i = 0; i < result.pvLength; ++i) {
+        std::cout << ' ' << to_string(result.pv[i]);
+    }
+}
+
+}  // namespace
+
 Engine::Engine() {
     options_ = {
         UCIOption::spin("Hash", kDefaultHashMb, 1, 65536),
@@ -18,16 +45,16 @@ Engine::Engine() {
     init_engine();
 }
 
-void Engine::setOption_(std::string name, std::string value) {
+void Engine::setOption_(std::string name, std::string_view value) {
     auto option =
-        std::ranges::find_if(options_, [&](const UCIOption& opt) { return opt.key == normalized_option_key(name); });
+        std::ranges::find_if(options_, [&](const UCIOption& opt) { return opt.key() == normalized_option_key(name); });
     if (option == options_.end()) {
         std::cout << "Unknown option: " << name << '\n';
         return;
     }
 
     if (!option->setValue(value)) {
-        std::cout << "Invalid option or value: " << option->name << ": " << value << '\n';
+        std::cout << "Invalid value: " << value << '\n';
         return;
     }
 
@@ -36,16 +63,16 @@ void Engine::setOption_(std::string name, std::string value) {
 
 const UCIOption& Engine::option_(std::string_view name) const {
     auto it =
-        std::ranges::find_if(options_, [&](const UCIOption& opt) { return opt.key == normalized_option_key(name); });
+        std::ranges::find_if(options_, [&](const UCIOption& opt) { return opt.key() == normalized_option_key(name); });
     if (it == options_.end())
         throw std::invalid_argument("Unknown option: " + std::string(name));
     return *it;
 }
 
 void Engine::applyOption_(const UCIOption& option) {
-    if (option.key == "hash")
+    if (option.key() == "hash")
         tt_.resize(static_cast<size_t>(option.getValue<int>()));
-    else if (option.key == "default depth")
+    else if (option.key() == "default depth")
         searchLimits_.depth = static_cast<uint8_t>(option.getValue<int>());
 }
 
@@ -58,7 +85,9 @@ void Engine::debugSearch_() {
     auto start = std::chrono::high_resolution_clock::now();
     const auto result = search();
     auto end = std::chrono::high_resolution_clock::now();
-    const std::chrono::duration<double> elapsed = end - start;
+    const auto elapsedMs = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
+    const uint64_t totalNodes = result.nodes + result.qNodes;
+    const auto nps = static_cast<uint64_t>((1000 * totalNodes) / elapsedMs);
 
     std::cout << "info\n";
     std::cout << "Search result for: " << position_.toFEN() << '\n';
@@ -66,8 +95,8 @@ void Engine::debugSearch_() {
     std::cout << "Score (Absolute): " << engine::absolute_eval(result.score, position_.sideToMove()) << '\n';
     std::cout << "Nodes searched (Search): " << result.nodes << '\n';
     std::cout << "Nodes searched (Quiescence): " << result.qNodes << '\n';
-    std::cout << "Time taken: " << elapsed.count() << " seconds\n";
-    std::cout << "NPS (Total): " << static_cast<double>((result.nodes + result.qNodes)) / elapsed.count() << '\n';
+    std::cout << "Time taken: " << (static_cast<double>(elapsedMs) / 1000.0F) << " seconds\n";
+    std::cout << "NPS (Total): " << nps << '\n';
     std::cout << "TT size: " << (tt_.size() * sizeof(TTEntry)) / 1024 / 1024 << " MB\n";
     std::cout << "TT hits: " << tt_.hits() << '\n';
     std::cout << "TT misses: " << tt_.misses() << '\n';
@@ -75,6 +104,11 @@ void Engine::debugSearch_() {
     std::cout << "TT writes: " << tt_.writes() << '\n';
     std::cout << "TT rewrites: " << tt_.rewrites() << '\n';
     std::cout << "TT rewrite rate: " << tt_.rewriteRate() * 100.0F << "%\n";
+    std::cout << "info depth " << searchLimits_.depth << ' ';
+    printUciScore(result.score);
+    std::cout << " nodes " << totalNodes << " time " << elapsedMs << " nps " << nps;
+    printUciPV(result);
+    std::cout << '\n';
     std::cout << to_string(position_) << '\n';
     std::cout << "bestmove " << to_string(result.bestMove) << '\n';
 }
