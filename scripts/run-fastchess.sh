@@ -12,8 +12,11 @@ RUN_DIR="${OUTPUT_DIR}/$(date +%Y-%m-%d-%H-%M-%S)"
 ENGINE_A="${ENGINE_A:-name=Contender cmd=${ENGINE_CMD} option.Threads=4 option.Hash=1024}"
 ENGINE_B="${ENGINE_B:-name=Baseline cmd=${ENGINE_CMD} option.Threads=1 option.Hash=1024}"
 
+# ENGINE_A="${ENGINE_A:-name=Contender cmd=${ENGINE_CMD} option.Threads=1 option.Hash=1024}"
+# ENGINE_B="${ENGINE_B:-name=Baseline cmd=stockfish option.Threads=1 option.UCI_LimitStrength=true option.UCI_Elo=1650}"
+
 TIME_CONTROL="${TIME_CONTROL:-0:10+0.1}"
-ROUNDS="${ROUNDS:-100}"
+ROUNDS="${ROUNDS:-25}"
 CONCURRENCY="${CONCURRENCY:-4}"
 BOOK_PLIES="${BOOK_PLIES:-10}"
 WRITE_LOGS="${WRITE_LOGS:-0}"
