@@ -53,8 +53,8 @@ SearchResult Search::search(Position& pos, const SearchLimits& limits) {
     if (isTerminal_(pos, moves, 0, terminalScore)) {
         result.score = terminalScore;
         result.bestMove = Move{};
-        result.nodes = nodes_;
-        result.qNodes = qNodes_;
+        result.telemetry.nodes = nodes_;
+        result.telemetry.qNodes = qNodes_;
         return result;
     }
 
@@ -134,7 +134,7 @@ SearchResult Search::search(Position& pos, const SearchLimits& limits) {
         bestScore = iterationBestScore;
         result.score = bestScore;
         result.bestMove = bestMove;
-        result.completedDepth = currentDepth;
+        result.telemetry.completedDepth = currentDepth;
         result.pvLength = pvLength_[0];
         for (uint8_t i = 0; i < result.pvLength; ++i) {
             result.pv[i] = pvTable_[0][i];
@@ -146,7 +146,7 @@ SearchResult Search::search(Position& pos, const SearchLimits& limits) {
         }
     }
 
-    if (result.completedDepth == 0) {
+    if (result.telemetry.completedDepth == 0) {
         result.bestMove = bestMove;
         result.score = bestScore;
         if (!bestMove.isNone()) {
@@ -155,8 +155,8 @@ SearchResult Search::search(Position& pos, const SearchLimits& limits) {
         }
     }
 
-    result.nodes = nodes_;
-    result.qNodes = qNodes_;
+    result.telemetry.nodes = nodes_;
+    result.telemetry.qNodes = qNodes_;
     result.stopped = aborted_ || softStopped;
     return result;
 }

@@ -16,12 +16,12 @@ enum class Bound : uint8_t {
 };
 
 struct TTEntry {
-    Key hash{};
-    TTScore score{};
-    Move bestMove;
-    Bound bound{};
-    uint8_t depth{};
-    uint8_t age{};
+    Key hash{};         // Hash of position
+    TTScore score{};    // Score from this position
+    Move bestMove;      // Best move from this position
+    Bound bound{};      // Type of bound (exact, lower, upper)
+    uint8_t depth{};    // Search depth at which this entry was stored (used for replacement)
+    uint8_t age{};      // Age of the entry (used for replacement)
 };
 static_assert(sizeof(TTEntry) == 16);
 
@@ -34,13 +34,23 @@ static_assert(sizeof(TTEntry) == 16);
 // Bits 112-119:    Age
 using PackedTTEntry = __uint128_t;
 
+struct TTStats {
+    uint64_t hits{};
+    uint64_t misses{};
+    uint64_t writes{};
+    uint64_t rewrites{};
+};
+
 class TranspositionTable {
 public:
     TranspositionTable() noexcept = default;
     explicit TranspositionTable(size_t sizeMB) { resize(sizeMB); }
     void resize(size_t sizeMB);
     void clear() noexcept;
-    size_t size() const noexcept { return size_; }
+    size_t size() const noexcept {
+        assert(size_ == table_.size());
+        return size_;
+    }
     bool empty() const noexcept { return size_ == 0; }
     void newSearch() noexcept { ++age_; }
 
@@ -48,23 +58,33 @@ public:
     void store(Key key, Move move, TTScore score, uint8_t depth, Bound bound, int ply) noexcept;
 
     // Statistics
-    size_t hits() const noexcept { return hits_; }
-    size_t misses() const noexcept { return misses_; }
-    size_t writes() const noexcept { return writes_; }
-    size_t rewrites() const noexcept { return rewrites_; }
+    size_t hits() const noexcept { return hits_.load(std::memory_order_relaxed); }
+    size_t misses() const noexcept { return misses_.load(std::memory_order_relaxed); }
+    size_t writes() const noexcept { return writes_.load(std::memory_order_relaxed); }
+    size_t rewrites() const noexcept { return rewrites_.load(std::memory_order_relaxed); }
+    TTStats stats() const noexcept {
+        return TTStats{
+            .hits = hits_.load(std::memory_order_relaxed),
+            .misses = misses_.load(std::memory_order_relaxed),
+            .writes = writes_.load(std::memory_order_relaxed),
+            .rewrites = rewrites_.load(std::memory_order_relaxed),
+        };
+    }
     float hitRate() const noexcept {
-        const size_t totalAccesses = hits_ + misses_;
-        return (totalAccesses > 0) ? static_cast<float>(hits_) / static_cast<float>(totalAccesses) : 0.0F;
+        const TTStats snapshot = stats();
+        const uint64_t totalAccesses = snapshot.hits + snapshot.misses;
+        return (totalAccesses > 0) ? static_cast<float>(snapshot.hits) / static_cast<float>(totalAccesses) : 0.0F;
     }
     float rewriteRate() const noexcept {
-        const size_t totalWrites = writes_ + rewrites_;
-        return (totalWrites > 0) ? static_cast<float>(rewrites_) / static_cast<float>(totalWrites) : 0.0F;
+        const TTStats snapshot = stats();
+        const uint64_t totalWrites = snapshot.writes + snapshot.rewrites;
+        return (totalWrites > 0) ? static_cast<float>(snapshot.rewrites) / static_cast<float>(totalWrites) : 0.0F;
     }
     void resetCounters() noexcept {
-        hits_ = 0;
-        misses_ = 0;
-        writes_ = 0;
-        rewrites_ = 0;
+        hits_.store(0, std::memory_order_relaxed);
+        misses_.store(0, std::memory_order_relaxed);
+        writes_.store(0, std::memory_order_relaxed);
+        rewrites_.store(0, std::memory_order_relaxed);
     }
 
 private:

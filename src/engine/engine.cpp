@@ -175,10 +175,17 @@ void Engine::startSearch_(
 
     searchThread_ = std::thread([this, root = root, limits]() mutable {
         const auto start = std::chrono::steady_clock::now();
-        const SearchResult result = runSearch_(root, limits);
+        SearchResult result = runSearch_(root, limits);
         const auto end = std::chrono::steady_clock::now();
         const auto elapsedMs =
             static_cast<uint64_t>(std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count());
+        const TTStats ttStats = tt_.stats();
+
+        result.telemetry.elapsedMs = elapsedMs;
+        result.telemetry.ttHits = ttStats.hits;
+        result.telemetry.ttMisses = ttStats.misses;
+        result.telemetry.ttWrites = ttStats.writes;
+        result.telemetry.ttRewrites = ttStats.rewrites;
 
         printSearchResult_(limits, result, elapsedMs);
     });
@@ -216,12 +223,12 @@ SearchResult Engine::runSearch_(const Position& root, const SearchLimits& limits
     for (size_t workerId = 1; workerId < workerResults.size(); ++workerId)
         mergeSearchResult_(aggregate, workerResults[workerId], false);
 
-    aggregate.nodes = 0;
-    aggregate.qNodes = 0;
+    aggregate.telemetry.nodes = 0;
+    aggregate.telemetry.qNodes = 0;
     aggregate.stopped = false;
     for (const SearchResult& workerResult : workerResults) {
-        aggregate.nodes += workerResult.nodes;
-        aggregate.qNodes += workerResult.qNodes;
+        aggregate.telemetry.nodes += workerResult.telemetry.nodes;
+        aggregate.telemetry.qNodes += workerResult.telemetry.qNodes;
         aggregate.stopped = aggregate.stopped || workerResult.stopped;
     }
 
@@ -229,8 +236,8 @@ SearchResult Engine::runSearch_(const Position& root, const SearchLimits& limits
 }
 
 void Engine::mergeSearchResult_(SearchResult& aggregate, const SearchResult& workerResult, bool preferWorker) {
-    const bool workerHasDeeperResult = workerResult.completedDepth > aggregate.completedDepth;
-    const bool sameDepth = workerResult.completedDepth == aggregate.completedDepth;
+    const bool workerHasDeeperResult = workerResult.telemetry.completedDepth > aggregate.telemetry.completedDepth;
+    const bool sameDepth = workerResult.telemetry.completedDepth == aggregate.telemetry.completedDepth;
     const bool workerHasPreferredScore = sameDepth && (preferWorker || workerResult.score > aggregate.score);
 
     if (workerHasDeeperResult || workerHasPreferredScore)
@@ -238,29 +245,24 @@ void Engine::mergeSearchResult_(SearchResult& aggregate, const SearchResult& wor
 }
 
 void Engine::printSearchResult_(const SearchLimits& limits, const SearchResult& result, uint64_t elapsedMs) {
-    const uint64_t totalNodes = result.nodes + result.qNodes;
+    const uint64_t totalNodes = result.telemetry.nodes + result.telemetry.qNodes;
     const auto nps = elapsedMs == 0 ? totalNodes : (1000 * totalNodes) / elapsedMs;
-
-    // std::cout << "info string Score (Relative): " << result.score << '\n';
-    // std::cout << "info string Score (Absolute): " << engine::absolute_eval(result.score, root.sideToMove()) << '\n';
-    // std::cout << "info string Nodes searched (Search): " << result.nodes << '\n';
-    // std::cout << "info string Nodes searched (Quiescence): " << result.qNodes << '\n';
-    // std::cout << "info string Time taken: " << (static_cast<double>(elapsedMs) / 1000.0F) << " seconds\n";
-    // std::cout << "info string NPS (Total): " << nps << '\n';
-    // std::cout << "info string TT size: " << (tt_.size() * sizeof(TTEntry)) / 1024 / 1024 << " MB\n";
-    // std::cout << "info string TT hits: " << tt_.hits() << '\n';
-    // std::cout << "info string TT misses: " << tt_.misses() << '\n';
-    // std::cout << "info string TT hit rate: " << tt_.hitRate() * 100.0F << "%\n";
-    // std::cout << "info string TT writes: " << tt_.writes() << '\n';
-    // std::cout << "info string TT rewrites: " << tt_.rewrites() << '\n';
-    // std::cout << "info string TT rewrite rate: " << tt_.rewriteRate() * 100.0F << "%\n";
-
-    const Depth reportedDepth = result.completedDepth > 0 ? result.completedDepth : std::min<Depth>(limits.depth, 1);
+    const Depth reportedDepth =
+        result.telemetry.completedDepth > 0 ? result.telemetry.completedDepth : std::min<Depth>(limits.depth, 1);
     std::cout << "info depth " << reportedDepth << ' ';
     printUciScore(result.score);
     std::cout << " nodes " << totalNodes << " time " << elapsedMs << " nps " << nps;
     printUciPV(result);
     std::cout << '\n';
+    std::cout << "info string telemetry"
+              << " nodes=" << result.telemetry.nodes
+              << " qnodes=" << result.telemetry.qNodes
+              << " elapsed_ms=" << result.telemetry.elapsedMs
+              << " tt_hits=" << result.telemetry.ttHits
+              << " tt_misses=" << result.telemetry.ttMisses
+              << " tt_writes=" << result.telemetry.ttWrites
+              << " tt_rewrites=" << result.telemetry.ttRewrites
+              << " completed_depth=" << result.telemetry.completedDepth << '\n';
 
     std::cout << "bestmove " << to_string(result.bestMove) << '\n';
     std::cout.flush();

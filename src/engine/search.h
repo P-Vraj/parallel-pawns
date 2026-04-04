@@ -36,15 +36,24 @@ struct SearchLimits {
     std::optional<TimeControl> timeControl{};
 };
 
+struct SearchTelemetry {
+    uint64_t nodes{};           // Number of regular search nodes searched
+    uint64_t qNodes{};          // Number of quiescence nodes searched
+    uint64_t elapsedMs{};       // Wall-clock time for the completed search
+    uint64_t ttHits{};          // TT probe hits across all workers
+    uint64_t ttMisses{};        // TT probe misses across all workers
+    uint64_t ttWrites{};        // TT writes into empty slots
+    uint64_t ttRewrites{};      // TT rewrites of existing slots
+    Depth completedDepth{};     // Deepest fully completed iterative deepening iteration
+};
+
 struct SearchResult {
-    uint64_t nodes{};                // Number of nodes searched
-    uint64_t qNodes{};               // Number of quiescence nodes searched
     Eval score{};                    // Relative evaluation of the position
-    Depth completedDepth{};          // Deepest fully completed iterative deepening iteration
     Move bestMove;                   // Best move found in the search, or `Move::none()` if no move found
     std::array<Move, kMaxPly> pv{};  // Principal variation from the root
     uint8_t pvLength{};              // Number of moves in `pv`
     bool stopped{};                  // Whether the search stopped before reaching its target depth
+    SearchTelemetry telemetry{};     // Search counters and timing info for this completed search
 };
 
 struct SearchSharedState {
