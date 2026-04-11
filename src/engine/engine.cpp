@@ -50,6 +50,12 @@ std::string summarizeRootMoves(const std::vector<Move>& moves) {
     return out;
 }
 
+std::string formatWorkerEndpoint(const DistributedWorkerReport& report) {
+    if (report.coordinatorParticipant)
+        return "coordinator";
+    return report.endpoint.host + ':' + std::to_string(report.endpoint.port);
+}
+
 TimeBudget buildTimeBudget(const SearchLimits& limits, Color sideToMove) noexcept {
     if (limits.moveTime.has_value())
         return TimeBudget{.softLimit = limits.moveTime, .hardLimit = limits.moveTime};
@@ -103,14 +109,71 @@ bool shouldUseDistributedSearch(
     return true;
 }
 
+void mergeSearchResult(SearchResult& aggregate, const SearchResult& workerResult, bool preferWorker) {
+    const bool workerHasDeeperResult = workerResult.telemetry.completedDepth > aggregate.telemetry.completedDepth;
+    const bool sameDepth = workerResult.telemetry.completedDepth == aggregate.telemetry.completedDepth;
+    const bool workerHasPreferredScore = sameDepth && (preferWorker || workerResult.score > aggregate.score);
+
+    if (workerHasDeeperResult || workerHasPreferredScore)
+        aggregate = workerResult;
+}
+
 }  // namespace
+
+SearchResult runParallelSearch(
+    const Position& root,
+    const SearchLimits& limits,
+    const std::vector<Key>& positionHistory,
+    TranspositionTable* tt,
+    SearchSharedState* sharedSearchState,
+    std::span<const Move> rootMoves
+) {
+    const int threadCount = std::max(1, limits.threads);
+    std::vector<SearchResult> workerResults(static_cast<size_t>(threadCount));
+    std::vector<std::thread> workers;
+    workers.reserve(static_cast<size_t>(threadCount));
+
+    for (int workerId = 0; workerId < threadCount; ++workerId) {
+        workers.emplace_back([&, workerId]() {
+            Position workerRoot = root;
+            Search worker(tt, sharedSearchState, workerId, positionHistory);
+            workerResults[static_cast<size_t>(workerId)] = rootMoves.empty()
+                ? worker.search(workerRoot, limits)
+                : worker.search(workerRoot, limits, rootMoves);
+        });
+    }
+
+    for (std::thread& worker : workers) {
+        if (worker.joinable())
+            worker.join();
+    }
+
+    SearchResult aggregate{};
+    if (!workerResults.empty())
+        aggregate = workerResults[0];
+
+    for (size_t workerId = 1; workerId < workerResults.size(); ++workerId)
+        mergeSearchResult(aggregate, workerResults[workerId], false);
+
+    aggregate.telemetry.nodes = 0;
+    aggregate.telemetry.qNodes = 0;
+    aggregate.stopped = false;
+    for (const SearchResult& workerResult : workerResults) {
+        aggregate.telemetry.nodes += workerResult.telemetry.nodes;
+        aggregate.telemetry.qNodes += workerResult.telemetry.qNodes;
+        aggregate.stopped = aggregate.stopped || workerResult.stopped;
+    }
+
+    return aggregate;
+}
 
 Engine::Engine() {
     options_ = {
         UCIOption::spin("Hash", kDefaultHashMb, 1, 65536),
         UCIOption::spin("Default Depth", kDefaultDepth, 1, 255),
         UCIOption::spin("Threads", kDefaultThreads, 1, 1024),
-        UCIOption::string("Distributed_Workers", "")
+        UCIOption::string("Distributed_Workers", ""),
+        UCIOption::string("Distributed_Workers_Config", "")
     };
     init_engine();
     position_ = Position::fromFEN(startpos);
@@ -119,6 +182,7 @@ Engine::Engine() {
 
 Engine::~Engine() {
     stopSearch_();
+    distributedCoordinatorSessions_.reset();
 }
 
 void Engine::setOption_(std::string name, std::string_view value) {
@@ -163,10 +227,24 @@ void Engine::applyOption_(const UCIOption& option) {
             return;
         }
         distributedWorkers_ = std::move(endpoints);
+        distributedCoordinatorSessions_.setEndpoints(distributedWorkers_);
+    }
+    else if (option.key() == "distributed workers config") {
+        std::vector<DistributedWorkerEndpoint> endpoints;
+        std::string error;
+        if (!parseDistributedWorkerConfigFile(option.getValue<std::string>(), endpoints, error)) {
+            std::cout << "info string Invalid Distributed Workers Config value: " << error << '\n';
+            std::cout.flush();
+            return;
+        }
+        distributedWorkers_ = std::move(endpoints);
+        distributedCoordinatorSessions_.setEndpoints(distributedWorkers_);
     }
 
-    if (option.key() == "hash")
+    if (option.key() == "hash") {
         tt_.clear();
+        distributedCoordinatorSessions_.reset();
+    }
 }
 
 void Engine::setPosition_(std::string_view fen) {
@@ -194,8 +272,12 @@ void Engine::startSearch_(
 ) {
     stopSearch_();
 
+    const bool timeManagedSearch = moveTime.has_value() || timeControl.has_value();
+    const Depth requestedDepth =
+        depthOverride.value_or(timeManagedSearch ? static_cast<Depth>(kMaxPly - 1) : searchLimits_.depth);
+
     const SearchLimits limits{
-        .depth = depthOverride.value_or(searchLimits_.depth),
+        .depth = requestedDepth,
         .threads = searchLimits_.threads,
         .infinite = infinite,
         .moveTime = moveTime,
@@ -252,54 +334,15 @@ SearchResult Engine::runSearch_(const Position& root, const SearchLimits& limits
             static_cast<size_t>(option_("Hash").getValue<int>()),
             &sharedSearchState_,
             distributedWorkers_,
+            &distributedCoordinatorSessions_,
             &lastDistributedReports_
         );
     }
-
-    const int threadCount = std::max(1, limits.threads);
-    std::vector<SearchResult> workerResults(static_cast<size_t>(threadCount));
-    std::vector<std::thread> workers;
-    workers.reserve(static_cast<size_t>(threadCount));
-
-    for (int workerId = 0; workerId < threadCount; ++workerId) {
-        workers.emplace_back([&, workerId]() {
-            Position workerRoot = root;
-            Search worker(&tt_, &sharedSearchState_, workerId, positionHistory_);
-            workerResults[static_cast<size_t>(workerId)] = worker.search(workerRoot, limits);
-        });
-    }
-
-    for (std::thread& worker : workers) {
-        if (worker.joinable())
-            worker.join();
-    }
-
-    SearchResult aggregate{};
-    if (!workerResults.empty())
-        aggregate = workerResults[0];
-
-    for (size_t workerId = 1; workerId < workerResults.size(); ++workerId)
-        mergeSearchResult_(aggregate, workerResults[workerId], false);
-
-    aggregate.telemetry.nodes = 0;
-    aggregate.telemetry.qNodes = 0;
-    aggregate.stopped = false;
-    for (const SearchResult& workerResult : workerResults) {
-        aggregate.telemetry.nodes += workerResult.telemetry.nodes;
-        aggregate.telemetry.qNodes += workerResult.telemetry.qNodes;
-        aggregate.stopped = aggregate.stopped || workerResult.stopped;
-    }
-
-    return aggregate;
+    return runParallelSearch(root, limits, positionHistory_, &tt_, &sharedSearchState_);
 }
 
 void Engine::mergeSearchResult_(SearchResult& aggregate, const SearchResult& workerResult, bool preferWorker) {
-    const bool workerHasDeeperResult = workerResult.telemetry.completedDepth > aggregate.telemetry.completedDepth;
-    const bool sameDepth = workerResult.telemetry.completedDepth == aggregate.telemetry.completedDepth;
-    const bool workerHasPreferredScore = sameDepth && (preferWorker || workerResult.score > aggregate.score);
-
-    if (workerHasDeeperResult || workerHasPreferredScore)
-        aggregate = workerResult;
+    mergeSearchResult(aggregate, workerResult, preferWorker);
 }
 
 void Engine::printSearchResult_(const SearchLimits& limits, const SearchResult& result, uint64_t elapsedMs) {
@@ -324,9 +367,13 @@ void Engine::printSearchResult_(const SearchLimits& limits, const SearchResult& 
 
     for (const DistributedWorkerReport& report : lastDistributedReports_) {
         std::cout << "info string dist_worker"
-                  << " endpoint=" << report.endpoint.host << ':' << report.endpoint.port
-                  << " mode=" << (report.usedRemote ? "remote" : "local")
+                  << " endpoint=" << formatWorkerEndpoint(report)
+                  << " threads=" << report.endpoint.threads
+                  << " mode=" << (report.coordinatorParticipant ? "coordinator" : (report.usedRemote ? "remote" : "local"))
                   << " fallback_local=" << (report.fallbackToLocal ? 1 : 0)
+                  << " session_reused=" << (report.sessionReused ? 1 : 0)
+                  << " session_requests=" << report.sessionRequestCount
+                  << " session_reconnects=" << report.sessionReconnectCount
                   << " assigned=" << report.assignedRootMoves.size()
                   << " moves=" << summarizeRootMoves(report.assignedRootMoves)
                   << " score=" << report.result.score

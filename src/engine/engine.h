@@ -1,5 +1,6 @@
 #pragma once
 #include <mutex>
+#include <span>
 #include <thread>
 #include <vector>
 
@@ -30,6 +31,15 @@ inline void init_engine() noexcept {
     });
 }
 
+SearchResult runParallelSearch(
+    const Position& root,
+    const SearchLimits& limits,
+    const std::vector<Key>& positionHistory,
+    TranspositionTable* tt,
+    SearchSharedState* sharedSearchState,
+    std::span<const Move> rootMoves = {}
+);
+
 class Engine {
 public:
     Engine();
@@ -50,6 +60,7 @@ private:
     std::vector<UCIOption> options_;
     std::vector<DistributedWorkerEndpoint> distributedWorkers_;
     std::vector<DistributedWorkerReport> lastDistributedReports_;
+    DistributedCoordinatorSessions distributedCoordinatorSessions_{};
     Position position_{};
     std::vector<Key> positionHistory_;
     TranspositionTable tt_{static_cast<size_t>(kDefaultHashMb)};

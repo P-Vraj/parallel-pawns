@@ -24,6 +24,7 @@ struct SearchLimits {
     Depth depth{1};
     int threads{1};
     bool infinite{false};
+    bool iterativeDeepening{true};
     std::optional<std::chrono::milliseconds> moveTime{};
 
     struct TimeControl {

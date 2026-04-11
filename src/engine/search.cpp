@@ -71,9 +71,10 @@ SearchResult Search::searchImpl_(Position& pos, const SearchLimits& limits, std:
     Move bestMove = moves.empty() ? Move{} : moves[0];
     Eval bestScore = evaluate_(pos);
     const Depth targetDepth = limits.infinite ? (kMaxPly - 1) : limits.depth;
+    const Depth firstDepth = limits.iterativeDeepening ? 1 : targetDepth;
     bool softStopped = false;
 
-    for (Depth currentDepth = 1; currentDepth <= targetDepth; ++currentDepth) {
+    for (Depth currentDepth = firstDepth; currentDepth <= targetDepth; ++currentDepth) {
         if (shouldStopHard_() || shouldStopSoft_()) {
             softStopped = softStopped || !aborted_;
             break;
