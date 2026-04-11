@@ -1,0 +1,17 @@
+{
+  "name": "parallel-pawns-backend",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Express/WebSocket backend that wraps the Parallel Pawns UCI engine",
+  "type": "module",
+  "scripts": {
+    "dev": "node --watch server.js",
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "cors": "^2.8.5",
+    "dotenv": "^17.2.3",
+    "express": "^5.1.0",
+    "ws": "^8.18.3"
+  }
+}

@@ -1,0 +1,20 @@
+{
+  "name": "parallel-pawns-frontend",
+  "private": true,
+  "version": "1.0.0",
+  "description": "React/Vite analysis board for the Parallel Pawns UCI engine",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "chess.js": "^1.4.0",
+    "react": "^19.2.4",
+    "react-chessboard": "^5.10.0",
+    "react-dom": "^19.2.4"
+  },
+  "devDependencies": {
+    "vite": "^8.0.7"
+  }
+}
