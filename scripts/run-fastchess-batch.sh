@@ -17,7 +17,7 @@ run_match() {
 
   local label="a${a_threads}-b${b_threads}-c${concurrency}-r${rounds}"
   local run_output_dir="${BASE_OUTPUT_DIR}/${label}"
-  local stdout_log="${BASE_OUTPUT_DIR}/${label}.log"
+  local stdout_log="${run_output_dir}/result.log"
 
   mkdir -p "${run_output_dir}"
 
@@ -29,13 +29,13 @@ run_match() {
   ENGINE_B="name=Baseline cmd=${ENGINE_CMD} option.Threads=${b_threads} option.Hash=1024" \
   CONCURRENCY="${concurrency}" \
   ROUNDS="${rounds}" \
-  OUTPUT_DIR="${run_output_dir}" \
-  bash "${RUN_SCRIPT}" >"${stdout_log}" 2>&1
+  RUN_DIR="${run_output_dir}" \
+  WRITE_LOGS=1 bash "${RUN_SCRIPT}" >"${stdout_log}" 2>&1
 }
 
 run_match 4 1 4 100
 run_match 8 1 2 100
-run_match 16 1 1 50
+run_match 16 1 1 100
 
 echo
 echo "Batch complete. Logs are in ${BASE_OUTPUT_DIR}"

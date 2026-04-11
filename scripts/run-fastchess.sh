@@ -4,10 +4,11 @@ set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 FASTCHESS_BIN="${FASTCHESS_BIN:-fastchess}"
+PARSER_SCRIPT="${ROOT_DIR}/scripts/parse-fastchess-telemetry.py"
 ENGINE_CMD="${ENGINE_CMD:-${ROOT_DIR}/build/engine}"
 BOOK_PATH="${BOOK_PATH:-${ROOT_DIR}/data/openings/UHO_Lichess_4852_v1.epd}"
 OUTPUT_DIR="${OUTPUT_DIR:-${ROOT_DIR}/scripts/fastchess_logs}"
-RUN_DIR="${OUTPUT_DIR}/$(date +%Y-%m-%d-%H-%M-%S)"
+RUN_DIR="${RUN_DIR:-${OUTPUT_DIR}/$(date +%Y-%m-%d-%H-%M-%S)}"
 
 ENGINE_A="${ENGINE_A:-name=Contender cmd=${ENGINE_CMD} option.Threads=4 option.Hash=1024}"
 ENGINE_B="${ENGINE_B:-name=Baseline cmd=${ENGINE_CMD} option.Threads=1 option.Hash=1024}"
@@ -42,8 +43,15 @@ args=(
 if [[ "${WRITE_LOGS}" != "0" ]]; then
   args+=(
     -pgnout "file=games.pgn" timeleft=true latency=true
-    -log "file=games.log" level=trace engine=true realtime=true
+    -log "file=trace.log" level=trace engine=true realtime=true
   )
 fi
 
-exec "${FASTCHESS_BIN}" "${args[@]}"
+fastchess_status=0
+"${FASTCHESS_BIN}" "${args[@]}" || fastchess_status=$?
+
+if [[ "${WRITE_LOGS}" != "0" ]]; then
+  python3 "${PARSER_SCRIPT}" "trace.log"
+fi
+
+exit "${fastchess_status}"

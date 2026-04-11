@@ -1,10 +1,12 @@
 #pragma once
 #include <mutex>
+#include <span>
 #include <thread>
 #include <vector>
 
 #include "geometry.h"
 #include "move_gen/attacks.h"
+#include "distributed_search.h"
 #include "position.h"
 #include "search.h"
 #include "types.h"
@@ -29,6 +31,15 @@ inline void init_engine() noexcept {
     });
 }
 
+SearchResult runParallelSearch(
+    const Position& root,
+    const SearchLimits& limits,
+    const std::vector<Key>& positionHistory,
+    TranspositionTable* tt,
+    SearchSharedState* sharedSearchState,
+    std::span<const Move> rootMoves = {}
+);
+
 class Engine {
 public:
     Engine();
@@ -47,6 +58,9 @@ private:
     static constexpr int kDefaultThreads = 1;
 
     std::vector<UCIOption> options_;
+    std::vector<DistributedWorkerEndpoint> distributedWorkers_;
+    std::vector<DistributedWorkerReport> lastDistributedReports_;
+    DistributedCoordinatorSessions distributedCoordinatorSessions_{};
     Position position_{};
     std::vector<Key> positionHistory_;
     TranspositionTable tt_{static_cast<size_t>(kDefaultHashMb)};

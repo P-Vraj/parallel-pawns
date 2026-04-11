@@ -28,6 +28,15 @@ Eval qsearch_gain(const Position& pos, Move move) noexcept {
 namespace engine {
 
 SearchResult Search::search(Position& pos, const SearchLimits& limits) {
+    MoveList moves(pos);
+    return searchImpl_(pos, limits, std::span<const Move>(moves.begin(), moves.size()));
+}
+
+SearchResult Search::search(Position& pos, const SearchLimits& limits, std::span<const Move> rootMoves) {
+    return searchImpl_(pos, limits, rootMoves);
+}
+
+SearchResult Search::searchImpl_(Position& pos, const SearchLimits& limits, std::span<const Move> rootMoves) {
     nodes_ = 0;
     qNodes_ = 0;
     aborted_ = false;
@@ -48,9 +57,10 @@ SearchResult Search::search(Position& pos, const SearchLimits& limits) {
 
     SearchResult result{};
 
-    MoveList moves(pos);
     Eval terminalScore = 0;
-    if (isTerminal_(pos, moves, 0, terminalScore)) {
+    MoveList generatedMoves(pos);
+    const auto moves = rootMoves.empty() ? std::span<const Move>(generatedMoves.begin(), generatedMoves.size()) : rootMoves;
+    if (isTerminal_(pos, generatedMoves, 0, terminalScore)) {
         result.score = terminalScore;
         result.bestMove = Move{};
         result.telemetry.nodes = nodes_;
@@ -61,9 +71,10 @@ SearchResult Search::search(Position& pos, const SearchLimits& limits) {
     Move bestMove = moves.empty() ? Move{} : moves[0];
     Eval bestScore = evaluate_(pos);
     const Depth targetDepth = limits.infinite ? (kMaxPly - 1) : limits.depth;
+    const Depth firstDepth = limits.iterativeDeepening ? 1 : targetDepth;
     bool softStopped = false;
 
-    for (Depth currentDepth = 1; currentDepth <= targetDepth; ++currentDepth) {
+    for (Depth currentDepth = firstDepth; currentDepth <= targetDepth; ++currentDepth) {
         if (shouldStopHard_() || shouldStopSoft_()) {
             softStopped = softStopped || !aborted_;
             break;
@@ -79,8 +90,11 @@ SearchResult Search::search(Position& pos, const SearchLimits& limits) {
             }
         }
 
-        orderMoves_(pos, moves, ttMove, 0);
-        diversifyRootMoves_(moves);
+        MoveList orderedMoves;
+        for (const Move move : moves)
+            orderedMoves.push_back(move);
+        orderMoves_(pos, orderedMoves, ttMove, 0);
+        diversifyRootMoves_(orderedMoves);
 
         Eval alpha = -kEvalInf;
         const Eval beta = kEvalInf;
@@ -89,7 +103,7 @@ SearchResult Search::search(Position& pos, const SearchLimits& limits) {
         Move iterationBestMove{};
         bool iterationAborted = false;
 
-        for (const Move m : moves) {
+        for (const Move m : orderedMoves) {
             if (shouldStopHard_()) {
                 iterationAborted = true;
                 break;

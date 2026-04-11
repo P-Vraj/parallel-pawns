@@ -4,6 +4,7 @@
 #include <atomic>
 #include <chrono>
 #include <optional>
+#include <span>
 #include <vector>
 
 #include "eval_constants.h"
@@ -23,6 +24,7 @@ struct SearchLimits {
     Depth depth{1};
     int threads{1};
     bool infinite{false};
+    bool iterativeDeepening{true};
     std::optional<std::chrono::milliseconds> moveTime{};
 
     struct TimeControl {
@@ -74,8 +76,10 @@ public:
         : tt_(tt), sharedState_(sharedState), workerId_(workerId), positionHistory_(std::move(rootHistory)) {}
 
     SearchResult search(Position& pos, const SearchLimits& limits);
+    SearchResult search(Position& pos, const SearchLimits& limits, std::span<const Move> rootMoves);
 
 private:
+    SearchResult searchImpl_(Position& pos, const SearchLimits& limits, std::span<const Move> rootMoves);
     Eval alphaBeta_(Position& pos, Depth depth, Eval alpha, Eval beta, int ply);
     Eval quiescence_(Position& pos, Eval alpha, Eval beta, int ply);
     static Eval evaluate_(const Position& pos) noexcept;
