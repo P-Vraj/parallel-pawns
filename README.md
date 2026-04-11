@@ -64,3 +64,54 @@ WRITE_LOGS=1 bash ./scripts/run-fastchess.sh
 This utilizes the Fastchess CLI to run games against engines, allowing for benchmarking and statistical analyses. Update the options by passing them through the command line or by modifying the script.
 
 *Note*: Must have [Fastchess](https://github.com/Disservin/fastchess) and an opening book installed. View [`./scripts/run-fastchess.sh`](./scripts/run-fastchess.sh) and [`./data/openings/README.md`](./data/openings/README.md) for more details.
+
+## Web UI
+
+The project includes a local player-vs-engine web UI with:
+- `backend/`: Node.js server that launches the UCI engine and streams moves/evaluation over WebSocket
+- `src/frontend/`: React + Vite app using `react-chessboard` and `chess.js`
+
+### Requirements
+
+Run from WSL/Linux.
+
+Required:
+- Node.js
+- npm
+- a built engine binary at `build/engine`
+
+### Setup
+
+Create the backend config:
+
+```bash
+cp backend/.env.example backend/.env
+```
+
+Default engine path in backend/.env:
+```bash
+ENGINE_PATH=../build/engine
+```
+Update it only if your engine binary is somewhere else.
+
+
+Start the backend:
+```bash
+cd backend
+npm install
+npm run dev
+```
+
+Start the frontend in a second terminal:
+```bash
+cd src/frontend
+npm install
+npm run dev
+```
+
+
+Open frontend:
+http://localhost:5173
+
+Open backend health check:
+http://localhost:3001/health
