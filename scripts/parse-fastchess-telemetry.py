@@ -48,6 +48,10 @@ EXPECTED_DIST_WORKER_FIELDS = (
 )
 
 OPTIONAL_DIST_WORKER_FIELDS = (
+    "threads",
+    "session_reused",
+    "session_requests",
+    "session_reconnects",
     "tt_hits",
     "tt_misses",
     "tt_writes",
@@ -123,9 +127,13 @@ class Aggregate:
 @dataclass
 class DistWorkerAggregate:
     reports: int = 0
+    coordinator_reports: int = 0
     remote_reports: int = 0
     local_reports: int = 0
     fallback_local_reports: int = 0
+    session_reused_reports: int = 0
+    max_session_requests: int = 0
+    max_session_reconnects: int = 0
     assigned_root_moves: int = 0
     nodes: int = 0
     qnodes: int = 0
@@ -138,9 +146,13 @@ class DistWorkerAggregate:
 
     def add(self, fields: dict[str, str]) -> None:
         self.reports += 1
+        self.coordinator_reports += 1 if fields["mode"] == "coordinator" else 0
         self.remote_reports += 1 if fields["mode"] == "remote" else 0
         self.local_reports += 1 if fields["mode"] == "local" else 0
         self.fallback_local_reports += int(fields["fallback_local"])
+        self.session_reused_reports += int(fields["session_reused"])
+        self.max_session_requests = max(self.max_session_requests, int(fields["session_requests"]))
+        self.max_session_reconnects = max(self.max_session_reconnects, int(fields["session_reconnects"]))
         self.assigned_root_moves += int(fields["assigned"])
         self.nodes += int(fields["nodes"])
         self.qnodes += int(fields["qnodes"])
@@ -153,9 +165,13 @@ class DistWorkerAggregate:
 
     def merge(self, other: "DistWorkerAggregate") -> None:
         self.reports += other.reports
+        self.coordinator_reports += other.coordinator_reports
         self.remote_reports += other.remote_reports
         self.local_reports += other.local_reports
         self.fallback_local_reports += other.fallback_local_reports
+        self.session_reused_reports += other.session_reused_reports
+        self.max_session_requests = max(self.max_session_requests, other.max_session_requests)
+        self.max_session_reconnects = max(self.max_session_reconnects, other.max_session_reconnects)
         self.assigned_root_moves += other.assigned_root_moves
         self.nodes += other.nodes
         self.qnodes += other.qnodes
@@ -176,9 +192,13 @@ class DistWorkerAggregate:
 
         return {
             "worker_reports": str(self.reports),
+            "coordinator_reports": str(self.coordinator_reports),
             "remote_reports": str(self.remote_reports),
             "local_reports": str(self.local_reports),
             "fallback_local_reports": str(self.fallback_local_reports),
+            "session_reused_reports": str(self.session_reused_reports),
+            "max_session_requests": str(self.max_session_requests),
+            "max_session_reconnects": str(self.max_session_reconnects),
             "assigned_root_moves": str(self.assigned_root_moves),
             "worker_nodes": str(self.nodes),
             "worker_qnodes": str(self.qnodes),
@@ -433,9 +453,13 @@ def main() -> int:
             "tt_rewrite_rate_pct",
             "avg_completed_depth",
             "worker_reports",
+            "coordinator_reports",
             "remote_reports",
             "local_reports",
             "fallback_local_reports",
+            "session_reused_reports",
+            "max_session_requests",
+            "max_session_reconnects",
             "assigned_root_moves",
             "worker_nodes",
             "worker_qnodes",
@@ -468,9 +492,13 @@ def main() -> int:
             "tt_rewrite_rate_pct",
             "avg_completed_depth",
             "worker_reports",
+            "coordinator_reports",
             "remote_reports",
             "local_reports",
             "fallback_local_reports",
+            "session_reused_reports",
+            "max_session_requests",
+            "max_session_reconnects",
             "assigned_root_moves",
             "worker_nodes",
             "worker_qnodes",
@@ -495,9 +523,13 @@ def main() -> int:
             "opponent",
             "result",
             "worker_reports",
+            "coordinator_reports",
             "remote_reports",
             "local_reports",
             "fallback_local_reports",
+            "session_reused_reports",
+            "max_session_requests",
+            "max_session_reconnects",
             "assigned_root_moves",
             "worker_nodes",
             "worker_qnodes",
@@ -523,9 +555,13 @@ def main() -> int:
             "opponent",
             "result",
             "worker_reports",
+            "coordinator_reports",
             "remote_reports",
             "local_reports",
             "fallback_local_reports",
+            "session_reused_reports",
+            "max_session_requests",
+            "max_session_reconnects",
             "assigned_root_moves",
             "worker_nodes",
             "worker_qnodes",

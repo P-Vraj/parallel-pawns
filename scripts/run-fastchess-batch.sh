@@ -4,7 +4,6 @@ set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 RUN_SCRIPT="${ROOT_DIR}/scripts/run-fastchess.sh"
-PARSER_SCRIPT="${ROOT_DIR}/scripts/parse-fastchess-telemetry.py"
 ENGINE_CMD="${ENGINE_CMD:-${ROOT_DIR}/build/engine}"
 BASE_OUTPUT_DIR="${BASE_OUTPUT_DIR:-${ROOT_DIR}/scripts/fastchess_logs/batch/$(date +%Y-%m-%d-%H-%M-%S)}"
 
@@ -32,7 +31,6 @@ run_match() {
   ROUNDS="${rounds}" \
   RUN_DIR="${run_output_dir}" \
   WRITE_LOGS=1 bash "${RUN_SCRIPT}" >"${stdout_log}" 2>&1
-  python3 "${PARSER_SCRIPT}" "${run_output_dir}/trace.log"
 }
 
 run_match 4 1 4 100

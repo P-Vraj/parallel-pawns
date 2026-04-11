@@ -4,6 +4,7 @@ set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 FASTCHESS_BIN="${FASTCHESS_BIN:-fastchess}"
+PARSER_SCRIPT="${ROOT_DIR}/scripts/parse-fastchess-telemetry.py"
 ENGINE_CMD="${ENGINE_CMD:-${ROOT_DIR}/build/engine}"
 BOOK_PATH="${BOOK_PATH:-${ROOT_DIR}/data/openings/UHO_Lichess_4852_v1.epd}"
 OUTPUT_DIR="${OUTPUT_DIR:-${ROOT_DIR}/scripts/fastchess_logs}"
@@ -46,4 +47,11 @@ if [[ "${WRITE_LOGS}" != "0" ]]; then
   )
 fi
 
-exec "${FASTCHESS_BIN}" "${args[@]}"
+fastchess_status=0
+"${FASTCHESS_BIN}" "${args[@]}" || fastchess_status=$?
+
+if [[ "${WRITE_LOGS}" != "0" ]]; then
+  python3 "${PARSER_SCRIPT}" "trace.log"
+fi
+
+exit "${fastchess_status}"
