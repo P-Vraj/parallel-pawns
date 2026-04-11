@@ -12,8 +12,10 @@ from dataclasses import dataclass
 from pathlib import Path
 
 
-STARTED_GAME_RE = re.compile(r"Started game (?P<game>\d+) of \d+ \((?P<white>.+?) vs (?P<black>.+?)\)")
-FINISHED_GAME_RE = re.compile(r"Finished game (?P<game>\d+) \((?P<white>.+?) vs (?P<black>.+?)\): (?P<result>\S+)")
+LOG_CONTEXT_RE = re.compile(r"^.*?<(?P<context>\s*\d+)>\s+(?P<message>.*)$")
+ENGINE_LINE_RE = re.compile(r"^\[Engine\]\s+\[[^\]]+\]\s+<(?P<context>\s*\d+)>\s+(?P<engine>.+?)\s+--->\s+(?P<body>.*)$")
+STARTED_GAME_RE = re.compile(r"Game (?P<game>\d+) between (?P<white>.+?) and (?P<black>.+?) starting")
+FINISHED_GAME_RE = re.compile(r"Game (?P<game>\d+) between (?P<white>.+?) and (?P<black>.+?) finished")
 TELEMETRY_RE = re.compile(r"info string telemetry (?P<payload>.*)$")
 
 EXPECTED_FIELDS = (
@@ -26,13 +28,6 @@ EXPECTED_FIELDS = (
     "tt_rewrites",
     "completed_depth",
 )
-
-GAME_ID_PATTERNS = (
-    re.compile(r"\bgame\s+(?P<game>\d+)\b", re.IGNORECASE),
-    re.compile(r"\bg\s*(?P<game>\d+)\b", re.IGNORECASE),
-    re.compile(r"\[#(?P<game>\d+)\]"),
-)
-
 
 @dataclass
 class GameInfo:
@@ -107,7 +102,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "input",
         type=Path,
-        help="Path to a fastchess games.log file or to a run directory containing games.log",
+        help="Path to a fastchess trace.log file or to a run directory containing trace.log",
     )
     parser.add_argument(
         "--output-dir",
@@ -119,7 +114,7 @@ def parse_args() -> argparse.Namespace:
 
 def resolve_log_path(input_path: Path) -> Path:
     if input_path.is_dir():
-        return input_path / "games.log"
+        return input_path / "trace.log"
     return input_path
 
 
@@ -139,19 +134,11 @@ def parse_payload(payload: str) -> dict[str, int]:
     return fields
 
 
-def detect_game_id(line: str) -> int | None:
-    for pattern in GAME_ID_PATTERNS:
-        match = pattern.search(line)
-        if match:
-            return int(match.group("game"))
-    return None
-
-
-def detect_engine_name(prefix: str, engine_names: list[str]) -> str | None:
-    for name in engine_names:
-        if name and name in prefix:
-            return name
-    return None
+def parse_context(line: str) -> tuple[str, str] | None:
+    match = LOG_CONTEXT_RE.match(line)
+    if not match:
+        return None
+    return match.group("context").strip(), match.group("message")
 
 
 def write_csv(path: Path, rows: list[dict[str, str]], fieldnames: list[str]) -> None:
@@ -174,37 +161,49 @@ def main() -> int:
     lines = log_path.read_text(encoding="utf-8", errors="replace").splitlines()
 
     games: dict[int, GameInfo] = {}
-    for line in lines:
-        if match := STARTED_GAME_RE.search(line):
-            game_id = int(match.group("game"))
-            games[game_id] = GameInfo(white=match.group("white"), black=match.group("black"))
-        elif match := FINISHED_GAME_RE.search(line):
-            game_id = int(match.group("game"))
-            existing = games.get(game_id, GameInfo(white=match.group("white"), black=match.group("black")))
-            existing.result = match.group("result")
-            games[game_id] = existing
-
-    engine_names = sorted({info.white for info in games.values()} | {info.black for info in games.values()}, key=len, reverse=True)
-
+    active_games_by_context: dict[str, int] = {}
     game_engine_aggregates: dict[tuple[int, str], Aggregate] = defaultdict(Aggregate)
     skipped_lines: list[str] = []
     unmatched_context = 0
 
     for line in lines:
-        match = TELEMETRY_RE.search(line)
+        parsed_context = parse_context(line)
+        if not parsed_context:
+            continue
+        context_id, message = parsed_context
+
+        if match := STARTED_GAME_RE.search(message):
+            game_id = int(match.group("game"))
+            games[game_id] = GameInfo(white=match.group("white"), black=match.group("black"))
+            active_games_by_context[context_id] = game_id
+            continue
+
+        if match := FINISHED_GAME_RE.search(message):
+            game_id = int(match.group("game"))
+            existing = games.get(game_id, GameInfo(white=match.group("white"), black=match.group("black")))
+            games[game_id] = existing
+            active_games_by_context.pop(context_id, None)
+            continue
+
+        match = ENGINE_LINE_RE.match(line)
         if not match:
             continue
 
-        payload = match.group("payload")
-        prefix = line[: match.start()]
+        body = match.group("body")
+        telemetry_match = TELEMETRY_RE.search(body)
+        if not telemetry_match:
+            continue
+
+        payload = telemetry_match.group("payload")
+        context_id = match.group("context").strip()
+        engine_name = match.group("engine").strip()
         try:
             fields = parse_payload(payload)
         except ValueError:
             skipped_lines.append(line)
             continue
 
-        game_id = detect_game_id(prefix)
-        engine_name = detect_engine_name(prefix, engine_names)
+        game_id = active_games_by_context.get(context_id)
 
         if game_id is None or engine_name is None:
             unmatched_context += 1
