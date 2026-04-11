@@ -40,6 +40,16 @@ void printUciPV(const SearchResult& result) {
     }
 }
 
+std::string summarizeRootMoves(const std::vector<Move>& moves) {
+    std::string out;
+    for (size_t i = 0; i < moves.size(); ++i) {
+        if (i != 0)
+            out += ',';
+        out += to_string(moves[i]);
+    }
+    return out;
+}
+
 TimeBudget buildTimeBudget(const SearchLimits& limits, Color sideToMove) noexcept {
     if (limits.moveTime.has_value())
         return TimeBudget{.softLimit = limits.moveTime, .hardLimit = limits.moveTime};
@@ -70,13 +80,37 @@ TimeBudget buildTimeBudget(const SearchLimits& limits, Color sideToMove) noexcep
     return TimeBudget{.softLimit = std::chrono::milliseconds{softMs}, .hardLimit = std::chrono::milliseconds{hardMs}};
 }
 
+bool shouldUseDistributedSearch(
+    const SearchLimits& limits,
+    const SearchSharedState& sharedState,
+    const std::vector<DistributedWorkerEndpoint>& distributedWorkers
+) noexcept {
+    if (distributedWorkers.empty() || limits.infinite)
+        return false;
+
+    constexpr auto kMinDistributedMovetime = std::chrono::milliseconds{750};
+    constexpr auto kMinDistributedSoftWindow = std::chrono::milliseconds{500};
+
+    if (limits.moveTime.has_value() && *limits.moveTime < kMinDistributedMovetime)
+        return false;
+
+    const auto now = std::chrono::steady_clock::now();
+    if (sharedState.hardDeadline.has_value() && *sharedState.hardDeadline <= now + kMinDistributedMovetime)
+        return false;
+    if (sharedState.softDeadline.has_value() && *sharedState.softDeadline <= now + kMinDistributedSoftWindow)
+        return false;
+
+    return true;
+}
+
 }  // namespace
 
 Engine::Engine() {
     options_ = {
         UCIOption::spin("Hash", kDefaultHashMb, 1, 65536),
         UCIOption::spin("Default Depth", kDefaultDepth, 1, 255),
-        UCIOption::spin("Threads", kDefaultThreads, 1, 1024)
+        UCIOption::spin("Threads", kDefaultThreads, 1, 1024),
+        UCIOption::string("Distributed_Workers", "")
     };
     init_engine();
     position_ = Position::fromFEN(startpos);
@@ -120,6 +154,16 @@ void Engine::applyOption_(const UCIOption& option) {
         searchLimits_.depth = static_cast<uint8_t>(option.getValue<int>());
     else if (option.key() == "threads")
         searchLimits_.threads = option.getValue<int>();
+    else if (option.key() == "distributed workers") {
+        std::vector<DistributedWorkerEndpoint> endpoints;
+        std::string error;
+        if (!parseDistributedWorkerEndpoints(option.getValue<std::string>(), endpoints, error)) {
+            std::cout << "info string Invalid Distributed Workers value: " << error << '\n';
+            std::cout.flush();
+            return;
+        }
+        distributedWorkers_ = std::move(endpoints);
+    }
 
     if (option.key() == "hash")
         tt_.clear();
@@ -198,6 +242,20 @@ void Engine::stopSearch_() {
 }
 
 SearchResult Engine::runSearch_(const Position& root, const SearchLimits& limits) {
+    lastDistributedReports_.clear();
+
+    if (shouldUseDistributedSearch(limits, sharedSearchState_, distributedWorkers_)) {
+        return runDistributedRootSplitSearch(
+            root,
+            limits,
+            positionHistory_,
+            static_cast<size_t>(option_("Hash").getValue<int>()),
+            &sharedSearchState_,
+            distributedWorkers_,
+            &lastDistributedReports_
+        );
+    }
+
     const int threadCount = std::max(1, limits.threads);
     std::vector<SearchResult> workerResults(static_cast<size_t>(threadCount));
     std::vector<std::thread> workers;
@@ -263,6 +321,25 @@ void Engine::printSearchResult_(const SearchLimits& limits, const SearchResult& 
               << " tt_writes=" << result.telemetry.ttWrites
               << " tt_rewrites=" << result.telemetry.ttRewrites
               << " completed_depth=" << result.telemetry.completedDepth << '\n';
+
+    for (const DistributedWorkerReport& report : lastDistributedReports_) {
+        std::cout << "info string dist_worker"
+                  << " endpoint=" << report.endpoint.host << ':' << report.endpoint.port
+                  << " mode=" << (report.usedRemote ? "remote" : "local")
+                  << " fallback_local=" << (report.fallbackToLocal ? 1 : 0)
+                  << " assigned=" << report.assignedRootMoves.size()
+                  << " moves=" << summarizeRootMoves(report.assignedRootMoves)
+                  << " score=" << report.result.score
+                  << " depth=" << report.result.telemetry.completedDepth
+                  << " nodes=" << report.result.telemetry.nodes
+                  << " qnodes=" << report.result.telemetry.qNodes
+                  << " tt_hits=" << report.result.telemetry.ttHits
+                  << " tt_misses=" << report.result.telemetry.ttMisses
+                  << " tt_writes=" << report.result.telemetry.ttWrites
+                  << " tt_rewrites=" << report.result.telemetry.ttRewrites
+                  << " stopped=" << (report.result.stopped ? 1 : 0)
+                  << " bestmove=" << to_string(report.result.bestMove) << '\n';
+    }
 
     std::cout << "bestmove " << to_string(result.bestMove) << '\n';
     std::cout.flush();

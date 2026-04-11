@@ -5,6 +5,7 @@
 
 #include "geometry.h"
 #include "move_gen/attacks.h"
+#include "distributed_search.h"
 #include "position.h"
 #include "search.h"
 #include "types.h"
@@ -47,6 +48,8 @@ private:
     static constexpr int kDefaultThreads = 1;
 
     std::vector<UCIOption> options_;
+    std::vector<DistributedWorkerEndpoint> distributedWorkers_;
+    std::vector<DistributedWorkerReport> lastDistributedReports_;
     Position position_{};
     std::vector<Key> positionHistory_;
     TranspositionTable tt_{static_cast<size_t>(kDefaultHashMb)};

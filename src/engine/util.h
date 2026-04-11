@@ -142,7 +142,11 @@ constexpr Square to_square(std::string_view str) {
 
 inline std::string normalized_option_key(std::string_view name) {
     std::string key(name);
-    std::ranges::transform(key, key.begin(), [](unsigned char ch) { return static_cast<char>(std::tolower(ch)); });
+    std::ranges::transform(key, key.begin(), [](unsigned char ch) {
+        if (ch == '_')
+            return ' ';
+        return static_cast<char>(std::tolower(ch));
+    });
     return key;
 }
 
