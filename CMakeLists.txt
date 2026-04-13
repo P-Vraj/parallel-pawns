@@ -49,6 +49,12 @@ if(ENABLE_NATIVE)
   target_compile_options(engine_warnings INTERFACE -march=native)
 endif()
 
+option(ENABLE_CX16 "Enable CMPXCHG16B for 128-bit atomics on x86" ON)
+
+if(ENABLE_CX16 AND CMAKE_SYSTEM_PROCESSOR MATCHES "x86_64|AMD64|amd64|i.86")
+  target_compile_options(engine_warnings INTERFACE -mcx16)
+endif()
+
 # Debug: -g -O0 -DDEBUG
 # Release: -O3 and LTO
 add_library(engine_opts INTERFACE)
