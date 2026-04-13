@@ -3,6 +3,7 @@
 #include <array>
 #include <atomic>
 #include <chrono>
+#include <functional>
 #include <optional>
 #include <span>
 #include <vector>
@@ -58,6 +59,8 @@ struct SearchResult {
     SearchTelemetry telemetry{};     // Search counters and timing info for this completed search
 };
 
+using SearchIterationCallback = std::function<void(const SearchResult&)>;
+
 struct SearchSharedState {
     std::atomic<bool> stopRequested{false};
     std::optional<std::chrono::steady_clock::time_point> softDeadline;
@@ -77,6 +80,7 @@ public:
 
     SearchResult search(Position& pos, const SearchLimits& limits);
     SearchResult search(Position& pos, const SearchLimits& limits, std::span<const Move> rootMoves);
+    void setIterationCallback(SearchIterationCallback callback) { iterationCallback_ = std::move(callback); }
 
 private:
     SearchResult searchImpl_(Position& pos, const SearchLimits& limits, std::span<const Move> rootMoves);
@@ -120,6 +124,7 @@ private:
     std::vector<Key> positionHistory_;
     std::vector<size_t> irreversibleHistoryStarts_;
     size_t irreversibleHistoryStart_{0};
+    SearchIterationCallback iterationCallback_{};
 };
 
 }  // namespace engine

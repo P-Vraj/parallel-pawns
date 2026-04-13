@@ -37,7 +37,8 @@ SearchResult runParallelSearch(
     const std::vector<Key>& positionHistory,
     TranspositionTable* tt,
     SearchSharedState* sharedSearchState,
-    std::span<const Move> rootMoves = {}
+    std::span<const Move> rootMoves = {},
+    std::vector<SearchResult>* completedIterations = nullptr
 );
 
 class Engine {

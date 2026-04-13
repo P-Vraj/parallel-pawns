@@ -52,6 +52,9 @@ OPTIONAL_DIST_WORKER_FIELDS = (
     "session_reused",
     "session_requests",
     "session_reconnects",
+    "elapsed_ms",
+    "round_trip_ms",
+    "overhead_ms",
     "tt_hits",
     "tt_misses",
     "tt_writes",
@@ -135,6 +138,9 @@ class DistWorkerAggregate:
     max_session_requests: int = 0
     max_session_reconnects: int = 0
     assigned_root_moves: int = 0
+    elapsed_ms: int = 0
+    round_trip_ms: int = 0
+    overhead_ms: int = 0
     nodes: int = 0
     qnodes: int = 0
     tt_hits: int = 0
@@ -154,6 +160,9 @@ class DistWorkerAggregate:
         self.max_session_requests = max(self.max_session_requests, int(fields["session_requests"]))
         self.max_session_reconnects = max(self.max_session_reconnects, int(fields["session_reconnects"]))
         self.assigned_root_moves += int(fields["assigned"])
+        self.elapsed_ms += int(fields["elapsed_ms"])
+        self.round_trip_ms += int(fields["round_trip_ms"])
+        self.overhead_ms += int(fields["overhead_ms"])
         self.nodes += int(fields["nodes"])
         self.qnodes += int(fields["qnodes"])
         self.tt_hits += int(fields["tt_hits"])
@@ -173,6 +182,9 @@ class DistWorkerAggregate:
         self.max_session_requests = max(self.max_session_requests, other.max_session_requests)
         self.max_session_reconnects = max(self.max_session_reconnects, other.max_session_reconnects)
         self.assigned_root_moves += other.assigned_root_moves
+        self.elapsed_ms += other.elapsed_ms
+        self.round_trip_ms += other.round_trip_ms
+        self.overhead_ms += other.overhead_ms
         self.nodes += other.nodes
         self.qnodes += other.qnodes
         self.tt_hits += other.tt_hits
@@ -184,6 +196,7 @@ class DistWorkerAggregate:
 
     def as_row(self) -> dict[str, str]:
         total_nodes = self.nodes + self.qnodes
+        nps = (1000.0 * total_nodes / self.elapsed_ms) if self.elapsed_ms else 0.0
         tt_accesses = self.tt_hits + self.tt_misses
         tt_writes_total = self.tt_writes + self.tt_rewrites
         avg_depth = self.completed_depth_sum / self.reports if self.reports else 0.0
@@ -200,6 +213,10 @@ class DistWorkerAggregate:
             "max_session_requests": str(self.max_session_requests),
             "max_session_reconnects": str(self.max_session_reconnects),
             "assigned_root_moves": str(self.assigned_root_moves),
+            "worker_elapsed_ms": str(self.elapsed_ms),
+            "worker_round_trip_ms": str(self.round_trip_ms),
+            "worker_overhead_ms": str(self.overhead_ms),
+            "worker_nps": f"{nps:.2f}",
             "worker_nodes": str(self.nodes),
             "worker_qnodes": str(self.qnodes),
             "worker_total_nodes": str(total_nodes),
@@ -255,11 +272,12 @@ def parse_payload(payload: str) -> dict[str, int]:
 
 def parse_dist_worker_payload(payload: str) -> dict[str, str]:
     fields: dict[str, str] = {}
+    allowed_fields = set(EXPECTED_DIST_WORKER_FIELDS) | set(OPTIONAL_DIST_WORKER_FIELDS)
     for token in payload.split():
         if "=" not in token:
             continue
         key, value = token.split("=", 1)
-        if key not in EXPECTED_DIST_WORKER_FIELDS:
+        if key not in allowed_fields:
             continue
         fields[key] = value
 
@@ -461,6 +479,10 @@ def main() -> int:
             "max_session_requests",
             "max_session_reconnects",
             "assigned_root_moves",
+            "worker_elapsed_ms",
+            "worker_round_trip_ms",
+            "worker_overhead_ms",
+            "worker_nps",
             "worker_nodes",
             "worker_qnodes",
             "worker_total_nodes",
@@ -500,6 +522,10 @@ def main() -> int:
             "max_session_requests",
             "max_session_reconnects",
             "assigned_root_moves",
+            "worker_elapsed_ms",
+            "worker_round_trip_ms",
+            "worker_overhead_ms",
+            "worker_nps",
             "worker_nodes",
             "worker_qnodes",
             "worker_total_nodes",
@@ -531,6 +557,10 @@ def main() -> int:
             "max_session_requests",
             "max_session_reconnects",
             "assigned_root_moves",
+            "worker_elapsed_ms",
+            "worker_round_trip_ms",
+            "worker_overhead_ms",
+            "worker_nps",
             "worker_nodes",
             "worker_qnodes",
             "worker_total_nodes",
@@ -563,6 +593,10 @@ def main() -> int:
             "max_session_requests",
             "max_session_reconnects",
             "assigned_root_moves",
+            "worker_elapsed_ms",
+            "worker_round_trip_ms",
+            "worker_overhead_ms",
+            "worker_nps",
             "worker_nodes",
             "worker_qnodes",
             "worker_total_nodes",

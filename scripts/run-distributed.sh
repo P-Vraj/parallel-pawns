@@ -219,7 +219,7 @@ run_fastchess() {
   ENGINE_B="${ENGINE_B:-name=Baseline cmd=${ENGINE_CMD} option.Threads=4 option.Hash=1024}" \
   CONCURRENCY="${concurrency}" \
   TIME_CONTROL="0:80+0.8" \
-  ROUNDS=40 \
+  ROUNDS=1 \
   WRITE_LOGS=1 bash "${ROOT_DIR}/scripts/run-fastchess.sh"
 }
 

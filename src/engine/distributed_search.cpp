@@ -72,6 +72,7 @@ struct WorkerRequest {
 
 struct WorkerResponse {
     SearchResult result;
+    std::vector<SearchResult> completedIterations;
     TTStats ttStats{};
 };
 
@@ -176,6 +177,16 @@ std::string serializePv(const SearchResult& result) {
     for (uint8_t i = 0; i < result.pvLength; ++i) {
         if (!out.empty())
             out += ' ';
+        out += to_string(result.pv[i]);
+    }
+    return out;
+}
+
+std::string serializePvCsv(const SearchResult& result) {
+    std::string out;
+    for (uint8_t i = 0; i < result.pvLength; ++i) {
+        if (!out.empty())
+            out += ',';
         out += to_string(result.pv[i]);
     }
     return out;
@@ -345,8 +356,10 @@ SearchResult searchLocalSubset(
     const std::vector<Key>& positionHistory,
     SearchSharedState* sharedState,
     const std::vector<Move>& rootMoves,
+    std::vector<SearchResult>* completedIterations = nullptr,
     TTStats* ttStats = nullptr
 ) {
+    const auto start = std::chrono::steady_clock::now();
     tt.resetCounters();
     tt.newSearch();
     SearchResult result = runParallelSearch(
@@ -355,7 +368,11 @@ SearchResult searchLocalSubset(
         positionHistory,
         &tt,
         sharedState,
-        std::span<const Move>(rootMoves.begin(), rootMoves.size())
+        std::span<const Move>(rootMoves.begin(), rootMoves.size()),
+        completedIterations
+    );
+    result.telemetry.elapsedMs = static_cast<uint64_t>(
+        std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - start).count()
     );
 
     if (ttStats != nullptr)
@@ -371,10 +388,11 @@ SearchResult searchLocalSubset(
     size_t hashMb,
     SearchSharedState* sharedState,
     const std::vector<Move>& rootMoves,
+    std::vector<SearchResult>* completedIterations = nullptr,
     TTStats* ttStats = nullptr
 ) {
     TranspositionTable tt(hashMb);
-    return searchLocalSubset(tt, root, limits, positionHistory, sharedState, rootMoves, ttStats);
+    return searchLocalSubset(tt, root, limits, positionHistory, sharedState, rootMoves, completedIterations, ttStats);
 }
 
 std::string buildRequestMessage(const WorkerRequest& request) {
@@ -546,6 +564,7 @@ std::string buildResponseMessage(const WorkerResponse& response) {
     oss << "bestmove " << to_string(response.result.bestMove) << '\n';
     oss << "pv " << serializePv(response.result) << '\n';
     oss << "completed_depth " << response.result.telemetry.completedDepth << '\n';
+    oss << "elapsed_ms " << response.result.telemetry.elapsedMs << '\n';
     oss << "nodes " << response.result.telemetry.nodes << '\n';
     oss << "qnodes " << response.result.telemetry.qNodes << '\n';
     oss << "stopped " << (response.result.stopped ? 1 : 0) << '\n';
@@ -553,6 +572,14 @@ std::string buildResponseMessage(const WorkerResponse& response) {
     oss << "tt_misses " << response.ttStats.misses << '\n';
     oss << "tt_writes " << response.ttStats.writes << '\n';
     oss << "tt_rewrites " << response.ttStats.rewrites << '\n';
+    for (const SearchResult& iteration : response.completedIterations) {
+        oss << "iter"
+            << " depth=" << iteration.telemetry.completedDepth
+            << " score=" << iteration.score
+            << " bestmove=" << to_string(iteration.bestMove)
+            << " pv=" << serializePvCsv(iteration)
+            << '\n';
+    }
     oss << "end\n";
     return oss.str();
 }
@@ -584,6 +611,7 @@ bool parseResponse(
         return false;
 
     SearchResult result{};
+    std::vector<SearchResult> completedIterations;
     TTStats ttStats{};
     while (true) {
         const ConnectionLine responseLine = readLine(fd, std::chrono::milliseconds(50));
@@ -640,6 +668,10 @@ bool parseResponse(
             if (!parseInteger(value, result.telemetry.nodes))
                 return false;
         }
+        else if (key == "elapsed_ms") {
+            if (!parseInteger(value, result.telemetry.elapsedMs))
+                return false;
+        }
         else if (key == "qnodes") {
             if (!parseInteger(value, result.telemetry.qNodes))
                 return false;
@@ -666,9 +698,56 @@ bool parseResponse(
             if (!parseInteger(value, ttStats.rewrites))
                 return false;
         }
+        else if (key == "iter") {
+            SearchResult iteration{};
+            std::string pvCsv;
+            for (const std::string& token : split(value, ' ')) {
+                if (token.empty() || token.find('=') == std::string::npos)
+                    continue;
+                const size_t equals = token.find('=');
+                const std::string field = token.substr(0, equals);
+                const std::string fieldValue = token.substr(equals + 1);
+                if (field == "depth") {
+                    if (!parseInteger(fieldValue, iteration.telemetry.completedDepth))
+                        return false;
+                }
+                else if (field == "score") {
+                    if (!parseInteger(fieldValue, iteration.score))
+                        return false;
+                }
+                else if (field == "bestmove") {
+                    if (fieldValue == "0000")
+                        iteration.bestMove = Move::none();
+                    else {
+                        const auto bestMove = findMoveByUci(root, fieldValue);
+                        if (!bestMove.has_value())
+                            return false;
+                        iteration.bestMove = *bestMove;
+                    }
+                }
+                else if (field == "pv") {
+                    pvCsv = fieldValue;
+                }
+            }
+
+            Position pvPosition = root;
+            for (const std::string& moveText : split(pvCsv, ',')) {
+                if (moveText.empty() || iteration.pvLength >= kMaxPly)
+                    continue;
+                const auto move = findMoveByUci(pvPosition, moveText);
+                if (!move.has_value())
+                    return false;
+                iteration.pv[iteration.pvLength++] = *move;
+                UndoInfo undo{};
+                pvPosition.makeMove(*move, undo);
+            }
+
+            completedIterations.push_back(iteration);
+        }
     }
 
     response.result = result;
+    response.completedIterations = std::move(completedIterations);
     response.ttStats = ttStats;
     return true;
 }
@@ -719,6 +798,7 @@ void handleWorkerClient(int clientFd) {
         TTStats ttStats{};
         std::atomic<bool> searchFinished{false};
         SearchResult result{};
+        std::vector<SearchResult> completedIterations;
         std::thread searchThread([&]() {
             result = searchLocalSubset(
                 *sessionTt,
@@ -727,6 +807,7 @@ void handleWorkerClient(int clientFd) {
                 request.history,
                 &sharedState,
                 request.rootMoves,
+                &completedIterations,
                 &ttStats
             );
             searchFinished.store(true, std::memory_order_relaxed);
@@ -759,6 +840,7 @@ void handleWorkerClient(int clientFd) {
         logWorkerEvent(
             "request_done",
             "root_moves=" + std::to_string(request.rootMoves.size()) +
+                " elapsed_ms=" + std::to_string(result.telemetry.elapsedMs) +
                 " nodes=" + std::to_string(result.telemetry.nodes) +
                 " qnodes=" + std::to_string(result.telemetry.qNodes) +
                 " tt_hits=" + std::to_string(result.telemetry.ttHits) +
@@ -772,7 +854,16 @@ void handleWorkerClient(int clientFd) {
                 " bestmove=" + to_string(result.bestMove)
         );
 
-        if (!writeAll(clientFd, buildResponseMessage(WorkerResponse{.result = result, .ttStats = ttStats})))
+        if (!writeAll(
+                clientFd,
+                buildResponseMessage(
+                    WorkerResponse{
+                        .result = result,
+                        .completedIterations = completedIterations,
+                        .ttStats = ttStats,
+                    }
+                )
+            ))
             return;
     }
 }
@@ -951,7 +1042,7 @@ SearchResult runDistributedRootSplitSearch(
     std::vector<Move> allRootMoves(legalMoves.begin(), legalMoves.end());
     if (allRootMoves.empty()) {
         TTStats ttStats{};
-        return searchLocalSubset(root, limits, positionHistory, hashMb, sharedState, allRootMoves, &ttStats);
+        return searchLocalSubset(root, limits, positionHistory, hashMb, sharedState, allRootMoves, nullptr, &ttStats);
     }
 
     const size_t participantCount = std::min(endpoints.size() + 1, allRootMoves.size());
@@ -1011,190 +1102,221 @@ SearchResult runDistributedRootSplitSearch(
         }
     }
 
-    struct IterationState {
-        std::vector<SearchResult> results;
-        std::vector<DistributedWorkerReport> reports;
-    };
+    std::vector<SearchResult> participantResults(participantCount);
+    std::vector<std::vector<SearchResult>> participantIterations(participantCount);
+    std::vector<DistributedWorkerReport> localReports(participantCount);
+    std::vector<TTStats> participantTtStats(participantCount);
+    std::vector<std::thread> workers;
+    workers.reserve(participantCount);
 
-    const auto shouldAbortBeforeNextIteration = [&]() {
-        if (sharedState == nullptr)
-            return false;
-        if (sharedState->stopRequested.load(std::memory_order_relaxed))
-            return true;
-
-        const auto now = std::chrono::steady_clock::now();
-        return (sharedState->hardDeadline.has_value() && *sharedState->hardDeadline <= now) ||
-               (sharedState->softDeadline.has_value() && *sharedState->softDeadline <= now);
-    };
-
-    const auto runIteration = [&](Depth depth) {
-        IterationState state{
-            .results = std::vector<SearchResult>(participantCount),
-            .reports = std::vector<DistributedWorkerReport>(participantCount),
+    workers.emplace_back([&]() {
+        constexpr size_t coordinatorIndex = 0;
+        localReports[coordinatorIndex].endpoint = DistributedWorkerEndpoint{
+            .host = "coordinator",
+            .port = 0,
+            .threads = limits.threads,
         };
-        std::vector<TTStats> iterationTtStats(participantCount);
-        std::vector<std::thread> workers;
-        workers.reserve(participantCount);
+        localReports[coordinatorIndex].assignedRootMoves = assignments[coordinatorIndex];
+        localReports[coordinatorIndex].coordinatorParticipant = true;
+        localReports[coordinatorIndex].sessionReused = (*localRequestCounts)[coordinatorIndex] > 0;
+        localReports[coordinatorIndex].sessionRequestCount = (*localRequestCounts)[coordinatorIndex] + 1;
 
-        workers.emplace_back([&]() {
-            constexpr size_t coordinatorIndex = 0;
-            SearchLimits iterationLimits = limits;
-            iterationLimits.depth = depth;
-            iterationLimits.iterativeDeepening = false;
+        participantResults[coordinatorIndex] = searchLocalSubset(
+            *(*localTables)[coordinatorIndex],
+            root,
+            limits,
+            positionHistory,
+            sharedState,
+            assignments[coordinatorIndex],
+            &participantIterations[coordinatorIndex],
+            &participantTtStats[coordinatorIndex]
+        );
+        participantResults[coordinatorIndex].telemetry.ttHits = participantTtStats[coordinatorIndex].hits;
+        participantResults[coordinatorIndex].telemetry.ttMisses = participantTtStats[coordinatorIndex].misses;
+        participantResults[coordinatorIndex].telemetry.ttWrites = participantTtStats[coordinatorIndex].writes;
+        participantResults[coordinatorIndex].telemetry.ttRewrites = participantTtStats[coordinatorIndex].rewrites;
+        localReports[coordinatorIndex].roundTripMs = participantResults[coordinatorIndex].telemetry.elapsedMs;
+        ++(*localRequestCounts)[coordinatorIndex];
+    });
 
-            state.reports[coordinatorIndex].endpoint = DistributedWorkerEndpoint{
-                .host = "coordinator",
-                .port = 0,
-                .threads = limits.threads,
+    for (size_t remoteIndex = 0; remoteIndex < remoteWorkerCount; ++remoteIndex) {
+        workers.emplace_back([&, remoteIndex]() {
+            const size_t resultIndex = remoteIndex + 1;
+            const auto now = std::chrono::steady_clock::now();
+            const auto remainingSoft =
+                sharedState != nullptr && sharedState->softDeadline.has_value()
+                    ? std::optional<std::chrono::milliseconds>(
+                          std::chrono::milliseconds(std::max<int64_t>(
+                              0,
+                              std::chrono::duration_cast<std::chrono::milliseconds>(*sharedState->softDeadline - now).count()
+                          ))
+                      )
+                    : std::nullopt;
+            const auto remainingHard =
+                sharedState != nullptr && sharedState->hardDeadline.has_value()
+                    ? std::optional<std::chrono::milliseconds>(
+                          std::chrono::milliseconds(std::max<int64_t>(
+                              0,
+                              std::chrono::duration_cast<std::chrono::milliseconds>(*sharedState->hardDeadline - now).count()
+                          ))
+                      )
+                    : std::nullopt;
+
+            localReports[resultIndex].endpoint = endpoints[remoteIndex];
+            localReports[resultIndex].assignedRootMoves = assignments[resultIndex];
+
+            const WorkerRequest request{
+                .fen = root.toFEN(),
+                .history = positionHistory,
+                .rootMoves = assignments[resultIndex],
+                .limits = SearchLimits{
+                    .depth = limits.depth,
+                    .threads = endpoints[remoteIndex].threads,
+                    .infinite = limits.infinite,
+                    .iterativeDeepening = true,
+                    .moveTime = limits.moveTime,
+                    .timeControl = limits.timeControl,
+                },
+                .hashMb = hashMb,
+                .softLimit = remainingSoft,
+                .hardLimit = remainingHard
             };
-            state.reports[coordinatorIndex].assignedRootMoves = assignments[coordinatorIndex];
-            state.reports[coordinatorIndex].coordinatorParticipant = true;
-            state.reports[coordinatorIndex].sessionReused = (*localRequestCounts)[coordinatorIndex] > 0;
-            state.reports[coordinatorIndex].sessionRequestCount = (*localRequestCounts)[coordinatorIndex] + 1;
 
-            state.results[coordinatorIndex] = searchLocalSubset(
-                *(*localTables)[coordinatorIndex],
-                root,
-                iterationLimits,
-                positionHistory,
-                sharedState,
-                assignments[coordinatorIndex],
-                &iterationTtStats[coordinatorIndex]
+            RemoteWorkerSession& remoteSession = (*remoteSessions)[remoteIndex];
+            localReports[resultIndex].usedRemote = remoteSession.available;
+            localReports[resultIndex].sessionReused = remoteSession.requestCount > 0;
+            localReports[resultIndex].sessionRequestCount = remoteSession.requestCount + 1;
+            localReports[resultIndex].sessionReconnectCount = remoteSession.reconnectCount;
+
+            if (remoteSession.available && !writeAll(remoteSession.socket.value, buildRequestMessage(request))) {
+                remoteSession.available = false;
+                remoteSession.failed = true;
+                remoteSession.socket.reset();
+            }
+
+            if (!remoteSession.available) {
+                participantResults[resultIndex] = searchLocalSubset(
+                    *(*localTables)[resultIndex],
+                    root,
+                    request.limits,
+                    positionHistory,
+                    sharedState,
+                    assignments[resultIndex],
+                    &participantIterations[resultIndex],
+                    &participantTtStats[resultIndex]
+                );
+                localReports[resultIndex].sessionReused = (*localRequestCounts)[resultIndex] > 0;
+                localReports[resultIndex].sessionRequestCount = (*localRequestCounts)[resultIndex] + 1;
+                participantResults[resultIndex].telemetry.ttHits = participantTtStats[resultIndex].hits;
+                participantResults[resultIndex].telemetry.ttMisses = participantTtStats[resultIndex].misses;
+                participantResults[resultIndex].telemetry.ttWrites = participantTtStats[resultIndex].writes;
+                participantResults[resultIndex].telemetry.ttRewrites = participantTtStats[resultIndex].rewrites;
+                localReports[resultIndex].roundTripMs = participantResults[resultIndex].telemetry.elapsedMs;
+                ++(*localRequestCounts)[resultIndex];
+                localReports[resultIndex].fallbackToLocal = true;
+                return;
+            }
+
+            WorkerResponse response;
+            std::atomic<bool> stopSent{false};
+            const auto roundTripStart = std::chrono::steady_clock::now();
+            if (!parseResponse(remoteSession.socket.value, root, sharedState, stopSent, response)) {
+                remoteSession.available = false;
+                remoteSession.failed = true;
+                remoteSession.socket.reset();
+                participantResults[resultIndex] = searchLocalSubset(
+                    *(*localTables)[resultIndex],
+                    root,
+                    request.limits,
+                    positionHistory,
+                    sharedState,
+                    assignments[resultIndex],
+                    &participantIterations[resultIndex],
+                    &participantTtStats[resultIndex]
+                );
+                localReports[resultIndex].sessionReused = (*localRequestCounts)[resultIndex] > 0;
+                localReports[resultIndex].sessionRequestCount = (*localRequestCounts)[resultIndex] + 1;
+                participantResults[resultIndex].telemetry.ttHits = participantTtStats[resultIndex].hits;
+                participantResults[resultIndex].telemetry.ttMisses = participantTtStats[resultIndex].misses;
+                participantResults[resultIndex].telemetry.ttWrites = participantTtStats[resultIndex].writes;
+                participantResults[resultIndex].telemetry.ttRewrites = participantTtStats[resultIndex].rewrites;
+                localReports[resultIndex].roundTripMs = participantResults[resultIndex].telemetry.elapsedMs;
+                ++(*localRequestCounts)[resultIndex];
+                localReports[resultIndex].fallbackToLocal = true;
+                return;
+            }
+
+            localReports[resultIndex].roundTripMs = static_cast<uint64_t>(
+                std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - roundTripStart).count()
             );
-            state.results[coordinatorIndex].telemetry.ttHits = iterationTtStats[coordinatorIndex].hits;
-            state.results[coordinatorIndex].telemetry.ttMisses = iterationTtStats[coordinatorIndex].misses;
-            state.results[coordinatorIndex].telemetry.ttWrites = iterationTtStats[coordinatorIndex].writes;
-            state.results[coordinatorIndex].telemetry.ttRewrites = iterationTtStats[coordinatorIndex].rewrites;
-            ++(*localRequestCounts)[coordinatorIndex];
-            state.reports[coordinatorIndex].result = state.results[coordinatorIndex];
+            participantResults[resultIndex] = response.result;
+            participantIterations[resultIndex] = std::move(response.completedIterations);
+            ++remoteSession.requestCount;
+            localReports[resultIndex].sessionRequestCount = remoteSession.requestCount;
+            localReports[resultIndex].sessionReconnectCount = remoteSession.reconnectCount;
+            participantTtStats[resultIndex] = response.ttStats;
+            participantResults[resultIndex].telemetry.ttHits = participantTtStats[resultIndex].hits;
+            participantResults[resultIndex].telemetry.ttMisses = participantTtStats[resultIndex].misses;
+            participantResults[resultIndex].telemetry.ttWrites = participantTtStats[resultIndex].writes;
+            participantResults[resultIndex].telemetry.ttRewrites = participantTtStats[resultIndex].rewrites;
+            localReports[resultIndex].overheadMs =
+                localReports[resultIndex].roundTripMs > participantResults[resultIndex].telemetry.elapsedMs
+                    ? (localReports[resultIndex].roundTripMs - participantResults[resultIndex].telemetry.elapsedMs)
+                    : 0;
         });
+    }
 
-        for (size_t remoteIndex = 0; remoteIndex < remoteWorkerCount; ++remoteIndex) {
-            workers.emplace_back([&, remoteIndex, depth]() {
-                const size_t resultIndex = remoteIndex + 1;
-                const auto now = std::chrono::steady_clock::now();
-                const auto remainingSoft =
-                    sharedState != nullptr && sharedState->softDeadline.has_value()
-                        ? std::optional<std::chrono::milliseconds>(
-                              std::chrono::milliseconds(std::max<int64_t>(
-                                  0,
-                                  std::chrono::duration_cast<std::chrono::milliseconds>(*sharedState->softDeadline - now)
-                                      .count()
-                              ))
-                          )
-                        : std::nullopt;
-                const auto remainingHard =
-                    sharedState != nullptr && sharedState->hardDeadline.has_value()
-                        ? std::optional<std::chrono::milliseconds>(
-                              std::chrono::milliseconds(std::max<int64_t>(
-                                  0,
-                                  std::chrono::duration_cast<std::chrono::milliseconds>(*sharedState->hardDeadline - now)
-                                      .count()
-                              ))
-                          )
-                        : std::nullopt;
+    for (std::thread& worker : workers) {
+        if (worker.joinable())
+            worker.join();
+    }
 
-                state.reports[resultIndex].endpoint = endpoints[remoteIndex];
-                state.reports[resultIndex].assignedRootMoves = assignments[resultIndex];
-
-                const WorkerRequest request{
-                    .fen = root.toFEN(),
-                    .history = positionHistory,
-                    .rootMoves = assignments[resultIndex],
-                    .limits = SearchLimits{
-                        .depth = depth,
-                        .threads = endpoints[remoteIndex].threads,
-                        .infinite = limits.infinite,
-                        .iterativeDeepening = false,
-                        .moveTime = limits.moveTime,
-                        .timeControl = limits.timeControl,
-                    },
-                    .hashMb = hashMb,
-                    .softLimit = remainingSoft,
-                    .hardLimit = remainingHard
-                };
-
-                RemoteWorkerSession& remoteSession = (*remoteSessions)[remoteIndex];
-                state.reports[resultIndex].usedRemote = remoteSession.available;
-                state.reports[resultIndex].sessionReused = remoteSession.requestCount > 0;
-                state.reports[resultIndex].sessionRequestCount = remoteSession.requestCount + 1;
-                state.reports[resultIndex].sessionReconnectCount = remoteSession.reconnectCount;
-
-                if (remoteSession.available && !writeAll(remoteSession.socket.value, buildRequestMessage(request))) {
-                    remoteSession.available = false;
-                    remoteSession.failed = true;
-                    remoteSession.socket.reset();
-                }
-
-                if (!remoteSession.available) {
-                    state.results[resultIndex] = searchLocalSubset(
-                        *(*localTables)[resultIndex],
-                        root,
-                        request.limits,
-                        positionHistory,
-                        sharedState,
-                        assignments[resultIndex],
-                        &iterationTtStats[resultIndex]
-                    );
-                    state.reports[resultIndex].sessionReused = (*localRequestCounts)[resultIndex] > 0;
-                    state.reports[resultIndex].sessionRequestCount = (*localRequestCounts)[resultIndex] + 1;
-                    state.results[resultIndex].telemetry.ttHits = iterationTtStats[resultIndex].hits;
-                    state.results[resultIndex].telemetry.ttMisses = iterationTtStats[resultIndex].misses;
-                    state.results[resultIndex].telemetry.ttWrites = iterationTtStats[resultIndex].writes;
-                    state.results[resultIndex].telemetry.ttRewrites = iterationTtStats[resultIndex].rewrites;
-                    ++(*localRequestCounts)[resultIndex];
-                    state.reports[resultIndex].fallbackToLocal = true;
-                    state.reports[resultIndex].result = state.results[resultIndex];
-                    return;
-                }
-
-                WorkerResponse response;
-                std::atomic<bool> stopSent{false};
-                if (!parseResponse(remoteSession.socket.value, root, sharedState, stopSent, response)) {
-                    remoteSession.available = false;
-                    remoteSession.failed = true;
-                    remoteSession.socket.reset();
-                    state.results[resultIndex] = searchLocalSubset(
-                        *(*localTables)[resultIndex],
-                        root,
-                        request.limits,
-                        positionHistory,
-                        sharedState,
-                        assignments[resultIndex],
-                        &iterationTtStats[resultIndex]
-                    );
-                    state.reports[resultIndex].sessionReused = (*localRequestCounts)[resultIndex] > 0;
-                    state.reports[resultIndex].sessionRequestCount = (*localRequestCounts)[resultIndex] + 1;
-                    state.results[resultIndex].telemetry.ttHits = iterationTtStats[resultIndex].hits;
-                    state.results[resultIndex].telemetry.ttMisses = iterationTtStats[resultIndex].misses;
-                    state.results[resultIndex].telemetry.ttWrites = iterationTtStats[resultIndex].writes;
-                    state.results[resultIndex].telemetry.ttRewrites = iterationTtStats[resultIndex].rewrites;
-                    ++(*localRequestCounts)[resultIndex];
-                    state.reports[resultIndex].fallbackToLocal = true;
-                    state.reports[resultIndex].result = state.results[resultIndex];
-                    return;
-                }
-
-                state.results[resultIndex] = response.result;
-                ++remoteSession.requestCount;
-                state.reports[resultIndex].sessionRequestCount = remoteSession.requestCount;
-                state.reports[resultIndex].sessionReconnectCount = remoteSession.reconnectCount;
-                iterationTtStats[resultIndex] = response.ttStats;
-                state.results[resultIndex].telemetry.ttHits = iterationTtStats[resultIndex].hits;
-                state.results[resultIndex].telemetry.ttMisses = iterationTtStats[resultIndex].misses;
-                state.results[resultIndex].telemetry.ttWrites = iterationTtStats[resultIndex].writes;
-                state.results[resultIndex].telemetry.ttRewrites = iterationTtStats[resultIndex].rewrites;
-                state.reports[resultIndex].result = state.results[resultIndex];
-            });
-        }
-
-        for (std::thread& worker : workers) {
-            if (worker.joinable())
-                worker.join();
-        }
-
-        return state;
+    auto findIterationAtDepth = [](const std::vector<SearchResult>& iterations, Depth depth) -> const SearchResult* {
+        const auto it = std::ranges::find_if(
+            iterations,
+            [depth](const SearchResult& result) { return result.telemetry.completedDepth == depth; }
+        );
+        return it == iterations.end() ? nullptr : &(*it);
     };
+
+    auto makeReportedResult = [&](size_t index, Depth sharedDepth) {
+        SearchResult reported = participantResults[index];
+        if (sharedDepth == 0)
+            return reported;
+
+        if (const SearchResult* iteration = findIterationAtDepth(participantIterations[index], sharedDepth)) {
+            reported.score = iteration->score;
+            reported.bestMove = iteration->bestMove;
+            reported.pv = iteration->pv;
+            reported.pvLength = iteration->pvLength;
+            reported.telemetry.completedDepth = sharedDepth;
+        }
+        return reported;
+    };
+
+    Depth sharedDepth = participantResults.empty() ? 0 : participantResults.front().telemetry.completedDepth;
+    int zeroDepthParticipants = 0;
+    Depth positiveSharedDepth = 0;
+    bool havePositiveDepth = false;
+    for (const SearchResult& result : participantResults) {
+        sharedDepth = std::min(sharedDepth, result.telemetry.completedDepth);
+        if (result.telemetry.completedDepth == 0) {
+            ++zeroDepthParticipants;
+        }
+        else if (!havePositiveDepth) {
+            positiveSharedDepth = result.telemetry.completedDepth;
+            havePositiveDepth = true;
+        }
+        else {
+            positiveSharedDepth = std::min(positiveSharedDepth, result.telemetry.completedDepth);
+        }
+    }
+
+    bool usingDegradedSharedDepth = false;
+    if (sharedDepth == 0 && zeroDepthParticipants <= 1 && havePositiveDepth) {
+        sharedDepth = positiveSharedDepth;
+        usingDegradedSharedDepth = true;
+    }
 
     SearchResult aggregate{};
     aggregate.bestMove = allRootMoves.front();
@@ -1202,60 +1324,39 @@ SearchResult runDistributedRootSplitSearch(
     aggregate.pvLength = 1;
     aggregate.stopped = false;
 
-    std::vector<DistributedWorkerReport> latestReports;
-    const Depth targetDepth = limits.infinite ? static_cast<Depth>(kMaxPly - 1) : limits.depth;
+    SearchResult sharedBest{};
+    bool hasSharedBest = false;
+    for (size_t i = 0; i < participantCount; ++i) {
+        localReports[i].result = makeReportedResult(i, sharedDepth);
+        if (localReports[i].roundTripMs == 0)
+            localReports[i].roundTripMs = localReports[i].result.telemetry.elapsedMs;
+        aggregate.telemetry.nodes += participantResults[i].telemetry.nodes;
+        aggregate.telemetry.qNodes += participantResults[i].telemetry.qNodes;
+        aggregate.telemetry.ttHits += participantResults[i].telemetry.ttHits;
+        aggregate.telemetry.ttMisses += participantResults[i].telemetry.ttMisses;
+        aggregate.telemetry.ttWrites += participantResults[i].telemetry.ttWrites;
+        aggregate.telemetry.ttRewrites += participantResults[i].telemetry.ttRewrites;
+        aggregate.stopped = aggregate.stopped || participantResults[i].stopped;
 
-    for (Depth currentDepth = 1; currentDepth <= targetDepth; ++currentDepth) {
-        if (shouldAbortBeforeNextIteration()) {
-            aggregate.stopped = true;
-            break;
-        }
+        if (sharedDepth > 0 && localReports[i].result.telemetry.completedDepth >= sharedDepth)
+            mergeResult(sharedBest, localReports[i].result, hasSharedBest);
+    }
 
-        IterationState iteration = runIteration(currentDepth);
-        latestReports = std::move(iteration.reports);
-
-        SearchResult iterationBest{};
-        bool hasIterationBest = false;
-        bool iterationComplete = true;
-        bool iterationStopped = false;
-
-        for (const SearchResult& result : iteration.results) {
-            aggregate.telemetry.nodes += result.telemetry.nodes;
-            aggregate.telemetry.qNodes += result.telemetry.qNodes;
-            aggregate.telemetry.ttHits += result.telemetry.ttHits;
-            aggregate.telemetry.ttMisses += result.telemetry.ttMisses;
-            aggregate.telemetry.ttWrites += result.telemetry.ttWrites;
-            aggregate.telemetry.ttRewrites += result.telemetry.ttRewrites;
-
-            iterationStopped = iterationStopped || result.stopped;
-            if (result.telemetry.completedDepth < currentDepth) {
-                iterationComplete = false;
-                continue;
-            }
-
-            mergeResult(iterationBest, result, hasIterationBest);
-        }
-
-        if (!iterationComplete || !hasIterationBest) {
-            aggregate.stopped = true;
-            break;
-        }
-
-        aggregate.score = iterationBest.score;
-        aggregate.bestMove = iterationBest.bestMove;
-        aggregate.pv = iterationBest.pv;
-        aggregate.pvLength = iterationBest.pvLength;
-        aggregate.telemetry.completedDepth = currentDepth;
-        aggregate.stopped = iterationStopped;
-
-        if (sharedState != nullptr && sharedState->stopRequested.load(std::memory_order_relaxed)) {
-            aggregate.stopped = true;
-            break;
-        }
+    if (sharedDepth > 0 && hasSharedBest) {
+        aggregate.score = sharedBest.score;
+        aggregate.bestMove = sharedBest.bestMove;
+        aggregate.pv = sharedBest.pv;
+        aggregate.pvLength = sharedBest.pvLength;
+        aggregate.telemetry.completedDepth = sharedDepth;
+        aggregate.stopped = aggregate.stopped || usingDegradedSharedDepth;
+    }
+    else {
+        for (size_t i = 0; i < participantCount; ++i)
+            mergeResult(aggregate, participantResults[i], hasSharedBest);
     }
 
     if (reports != nullptr)
-        *reports = std::move(latestReports);
+        *reports = std::move(localReports);
 
     return aggregate;
 }

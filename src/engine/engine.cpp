@@ -89,13 +89,18 @@ TimeBudget buildTimeBudget(const SearchLimits& limits, Color sideToMove) noexcep
 bool shouldUseDistributedSearch(
     const SearchLimits& limits,
     const SearchSharedState& sharedState,
-    const std::vector<DistributedWorkerEndpoint>& distributedWorkers
+    const std::vector<DistributedWorkerEndpoint>& distributedWorkers,
+    size_t legalMoveCount
 ) noexcept {
     if (distributedWorkers.empty() || limits.infinite)
         return false;
 
-    constexpr auto kMinDistributedMovetime = std::chrono::milliseconds{750};
-    constexpr auto kMinDistributedSoftWindow = std::chrono::milliseconds{500};
+    const size_t participantCount = distributedWorkers.size() + 1;
+    if (legalMoveCount < (participantCount * 2))
+        return false;
+
+    constexpr auto kMinDistributedMovetime = std::chrono::milliseconds{1500};
+    constexpr auto kMinDistributedSoftWindow = std::chrono::milliseconds{1200};
 
     if (limits.moveTime.has_value() && *limits.moveTime < kMinDistributedMovetime)
         return false;
@@ -126,10 +131,12 @@ SearchResult runParallelSearch(
     const std::vector<Key>& positionHistory,
     TranspositionTable* tt,
     SearchSharedState* sharedSearchState,
-    std::span<const Move> rootMoves
+    std::span<const Move> rootMoves,
+    std::vector<SearchResult>* completedIterations
 ) {
     const int threadCount = std::max(1, limits.threads);
     std::vector<SearchResult> workerResults(static_cast<size_t>(threadCount));
+    std::vector<std::vector<SearchResult>> workerIterationResults(static_cast<size_t>(threadCount));
     std::vector<std::thread> workers;
     workers.reserve(static_cast<size_t>(threadCount));
 
@@ -137,6 +144,11 @@ SearchResult runParallelSearch(
         workers.emplace_back([&, workerId]() {
             Position workerRoot = root;
             Search worker(tt, sharedSearchState, workerId, positionHistory);
+            if (completedIterations != nullptr) {
+                worker.setIterationCallback([&, workerId](const SearchResult& result) {
+                    workerIterationResults[static_cast<size_t>(workerId)].push_back(result);
+                });
+            }
             workerResults[static_cast<size_t>(workerId)] = rootMoves.empty()
                 ? worker.search(workerRoot, limits)
                 : worker.search(workerRoot, limits, rootMoves);
@@ -162,6 +174,37 @@ SearchResult runParallelSearch(
         aggregate.telemetry.nodes += workerResult.telemetry.nodes;
         aggregate.telemetry.qNodes += workerResult.telemetry.qNodes;
         aggregate.stopped = aggregate.stopped || workerResult.stopped;
+    }
+
+    if (completedIterations != nullptr) {
+        completedIterations->clear();
+        const Depth maxCompletedDepth = aggregate.telemetry.completedDepth;
+        for (Depth depth = 1; depth <= maxCompletedDepth; ++depth) {
+            SearchResult depthAggregate{};
+            bool hasDepthAggregate = false;
+            for (size_t workerId = 0; workerId < workerIterationResults.size(); ++workerId) {
+                const auto& iterations = workerIterationResults[workerId];
+                const auto it = std::ranges::find_if(
+                    iterations,
+                    [depth](const SearchResult& result) { return result.telemetry.completedDepth == depth; }
+                );
+                if (it == iterations.end())
+                    continue;
+
+                if (!hasDepthAggregate) {
+                    depthAggregate = *it;
+                    hasDepthAggregate = true;
+                }
+                else {
+                    mergeSearchResult(depthAggregate, *it, false);
+                }
+            }
+
+            if (!hasDepthAggregate)
+                continue;
+
+            completedIterations->push_back(depthAggregate);
+        }
     }
 
     return aggregate;
@@ -325,8 +368,9 @@ void Engine::stopSearch_() {
 
 SearchResult Engine::runSearch_(const Position& root, const SearchLimits& limits) {
     lastDistributedReports_.clear();
+    MoveList legalMoves(root);
 
-    if (shouldUseDistributedSearch(limits, sharedSearchState_, distributedWorkers_)) {
+    if (shouldUseDistributedSearch(limits, sharedSearchState_, distributedWorkers_, legalMoves.size())) {
         return runDistributedRootSplitSearch(
             root,
             limits,
@@ -374,10 +418,13 @@ void Engine::printSearchResult_(const SearchLimits& limits, const SearchResult& 
                   << " session_reused=" << (report.sessionReused ? 1 : 0)
                   << " session_requests=" << report.sessionRequestCount
                   << " session_reconnects=" << report.sessionReconnectCount
+                  << " round_trip_ms=" << report.roundTripMs
+                  << " overhead_ms=" << report.overheadMs
                   << " assigned=" << report.assignedRootMoves.size()
                   << " moves=" << summarizeRootMoves(report.assignedRootMoves)
                   << " score=" << report.result.score
                   << " depth=" << report.result.telemetry.completedDepth
+                  << " elapsed_ms=" << report.result.telemetry.elapsedMs
                   << " nodes=" << report.result.telemetry.nodes
                   << " qnodes=" << report.result.telemetry.qNodes
                   << " tt_hits=" << report.result.telemetry.ttHits

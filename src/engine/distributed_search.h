@@ -28,6 +28,8 @@ struct DistributedWorkerReport {
     bool sessionReused{false};
     int sessionRequestCount{0};
     int sessionReconnectCount{0};
+    uint64_t roundTripMs{0};
+    uint64_t overheadMs{0};
 };
 
 class DistributedCoordinatorSessions {

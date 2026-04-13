@@ -153,6 +153,8 @@ SearchResult Search::searchImpl_(Position& pos, const SearchLimits& limits, std:
         for (uint8_t i = 0; i < result.pvLength; ++i) {
             result.pv[i] = pvTable_[0][i];
         }
+        if (iterationCallback_)
+            iterationCallback_(result);
 
         if (shouldStopSoft_()) {
             softStopped = true;
