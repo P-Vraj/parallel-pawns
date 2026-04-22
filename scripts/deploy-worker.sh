@@ -5,7 +5,7 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 REMOTE_HOST="${REMOTE_HOST:-}"
 REMOTE_USER="${REMOTE_USER:-}"
-REMOTE_DIR="${REMOTE_DIR:-parallel-pawns-mirror}"
+REMOTE_DIR="${REMOTE_DIR:-parallel-pawns}"
 REMOTE_PORT="${REMOTE_PORT:-5001}"
 REMOTE_BIND="${REMOTE_BIND:-0.0.0.0}"
 SSH_PORT="${SSH_PORT:-22}"
@@ -110,12 +110,10 @@ fi
 ssh "${ssh_opts[@]}" "${REMOTE_TARGET}" "mkdir -p '${REMOTE_DIR}'"
 rsync "${rsync_opts[@]}" -e "ssh -p ${SSH_PORT}" "${ROOT_DIR}/" "${REMOTE_TARGET}:${REMOTE_DIR}/"
 
-install_args=()
-if [[ "${INSTALL_DEPS}" == "0" ]]; then
-  install_args+=(--skip-deps)
+if [[ "${INSTALL_DEPS}" != "0" ]]; then
+  ssh "${ssh_opts[@]}" "${REMOTE_TARGET}" \
+    "cd '${REMOTE_DIR}' && bash ./scripts/install-worker.sh"
 fi
-
-ssh "${ssh_opts[@]}" "${REMOTE_TARGET}" "cd '${REMOTE_DIR}' && ./scripts/install-worker.sh ${install_args[*]}"
 
 if [[ "${START_WORKER}" != "0" ]]; then
   ssh "${ssh_opts[@]}" "${REMOTE_TARGET}" \

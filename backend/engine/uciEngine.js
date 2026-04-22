@@ -1,18 +1,31 @@
 import { EventEmitter } from "node:events";
+import fs from "node:fs";
 import { spawn } from "node:child_process";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
 import { parseBestMoveLine, parseInfoLine } from "./uciParser.js";
+
+const moduleDir = path.dirname(fileURLToPath(import.meta.url));
+const defaultWorkersConfigPath = path.resolve(moduleDir, "../workers.conf");
 
 function getSideToMoveFromFen(fen) {
   return fen?.trim().split(/\s+/)[1] === "b" ? "b" : "w";
 }
 
 export default class UciEngine extends EventEmitter {
-  constructor({ enginePath, depth = 2, cwd = process.cwd() }) {
+  constructor({
+    enginePath,
+    depth = 2,
+    cwd = process.cwd(),
+    workersConfigPath = defaultWorkersConfigPath,
+  }) {
     super();
     this.enginePath = enginePath ? path.resolve(cwd, enginePath) : "";
     this.depth = depth;
     this.cwd = cwd;
+    this.workersConfigPath = workersConfigPath
+      ? path.resolve(cwd, workersConfigPath)
+      : "";
     this.process = null;
     this.buffer = "";
     this.status = "idle";
@@ -75,6 +88,14 @@ export default class UciEngine extends EventEmitter {
     });
 
     this.sendCommand("uci");
+    if (
+      this.workersConfigPath &&
+      fs.existsSync(this.workersConfigPath)
+    ) {
+      this.sendCommand(
+        `setoption name Distributed_Workers_Config value ${this.workersConfigPath}`
+      );
+    }
     this.sendCommand("isready");
   }
 
